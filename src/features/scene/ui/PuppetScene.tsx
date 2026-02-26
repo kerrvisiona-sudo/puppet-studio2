@@ -30,8 +30,8 @@ import {
   TARGET_AVATAR_FOOTPRINT_DEPTH_M,
   TARGET_AVATAR_FOOTPRINT_WIDTH_M,
   TARGET_AVATAR_HEIGHT_M,
-} from '../../../planogram'
-import type { CameraDetectionOverlay, MonitoringCameraDefinition, Placement, RoomDefinition } from '../../../planogram'
+} from '../../../core/planogram-domain'
+import type { CameraDetectionOverlay, MonitoringCameraDefinition, Placement, RoomDefinition } from '../../../core/planogram-domain'
 import type { PartKey, PoseControls } from '../../../poseControls'
 import { usePoseStore } from '../../../app/state'
 import { useSceneViewportState } from '../hooks'

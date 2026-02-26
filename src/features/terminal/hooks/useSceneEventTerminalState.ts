@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 
-import { usePoseStore } from '../../../app/state'
+import { useSceneStore, useUiStore, useBridgeStore, useViewportStore } from '../../../app/state'
 import { listPoseStoreEngineCapabilities } from '../../../core/app-commanding'
 import { runtimeConfig } from '../../../core/config'
 import type { SceneEventLevel } from '../../../core/observability'
@@ -26,16 +26,23 @@ type CommandHistoryEntry = {
 }
 
 export function useSceneEventTerminalState() {
-  const activeToolMode = usePoseStore((state) => state.activeToolMode)
-  const sceneEditEnabled = usePoseStore((state) => state.sceneEditEnabled)
-  const sceneEventAutoScroll = usePoseStore((state) => state.sceneEventAutoScroll)
-  const sceneEventDroppedWhilePaused = usePoseStore((state) => state.sceneEventDroppedWhilePaused)
-  const sceneEventLog = usePoseStore((state) => state.sceneEventLog)
-  const sceneEventLogPaused = usePoseStore((state) => state.sceneEventLogPaused)
-  const sceneEventTerminalOpen = usePoseStore((state) => state.sceneEventTerminalOpen)
-  const sceneId = usePoseStore((state) => state.sceneId)
-  const sceneRemoteHoldEnabled = usePoseStore((state) => state.sceneRemoteHoldEnabled)
-  const showDimensions = usePoseStore((state) => state.showDimensions)
+  // UI state
+  const activeToolMode = useUiStore((state) => state.activeToolMode)
+  const sceneEventAutoScroll = useUiStore((state) => state.sceneEventAutoScroll)
+  const sceneEventDroppedWhilePaused = useUiStore((state) => state.sceneEventDroppedWhilePaused)
+  const sceneEventLog = useUiStore((state) => state.sceneEventLog)
+  const sceneEventLogPaused = useUiStore((state) => state.sceneEventLogPaused)
+  const sceneEventTerminalOpen = useUiStore((state) => state.sceneEventTerminalOpen)
+
+  // Scene state
+  const sceneEditEnabled = useSceneStore((state) => state.sceneEditEnabled)
+  const sceneId = useSceneStore((state) => state.sceneId)
+
+  // Bridge state
+  const sceneRemoteHoldEnabled = useBridgeStore((state) => state.sceneRemoteHoldEnabled)
+
+  // Viewport state
+  const showDimensions = useViewportStore((state) => state.showDimensions)
 
   const [sourceFilter, setSourceFilter] = useState('all')
   const [kindFilter, setKindFilter] = useState('all')
@@ -139,8 +146,9 @@ export function useSceneEventTerminalState() {
         dispatchFromTerminal(command)
       }
 
-      const state = usePoseStore.getState()
-      state.appendSceneEvent({
+      const sceneStore = useSceneStore.getState()
+      const uiStore = useUiStore.getState()
+      uiStore.appendSceneEvent({
         kind: result.status === 'ok' ? 'terminal_command' : 'terminal_command_error',
         level: result.status === 'ok' ? 'info' : 'warn',
         message: {
@@ -148,9 +156,9 @@ export function useSceneEventTerminalState() {
           input: result.input,
           message: result.message,
         },
-        revision: state.sceneRevision,
-        sceneId: state.sceneId,
-        sequence: state.sceneSequence,
+        revision: sceneStore.sceneRevision,
+        sceneId: sceneStore.sceneId,
+        sequence: sceneStore.sceneSequence,
         source: 'frontend.command_line',
         summary: `cmd ${result.input} -> ${result.message}`,
       })

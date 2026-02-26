@@ -1,4 +1,4 @@
-import type { CameraDetectionOverlay, MonitoringCameraDefinition } from '../../../planogram'
+import type { CameraDetectionOverlay, MonitoringCameraDefinition } from '../../../core/planogram-domain'
 
 type ImageDirection = 'left' | 'right' | 'up' | 'down'
 

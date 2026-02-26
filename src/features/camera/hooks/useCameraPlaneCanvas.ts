@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { RefObject } from 'react'
 
-import type { CameraDetectionOverlay, MonitoringCameraDefinition } from '../../../planogram'
+import type { CameraDetectionOverlay, MonitoringCameraDefinition } from '../../../core/planogram-domain'
 import { CAMERA_PANEL_DPR, CAMERA_PANEL_HEIGHT, CAMERA_PANEL_WIDTH, drawCameraPlane } from '../model'
 
 export function useCameraPlaneCanvas(

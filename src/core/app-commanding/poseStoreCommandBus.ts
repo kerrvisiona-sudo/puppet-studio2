@@ -7,6 +7,8 @@ import {
 } from './appCommandBus'
 import { reflectAppCommandToTerminalLine } from './commandReflection'
 import { usePoseStore } from '../../app/state/poseStore'
+import { useSceneStore, useViewportStore, useBridgeStore, useAvatarStore, useUiStore } from '../../app/state'
+import { sceneService, bridgeService } from '../../services'
 import { createEngineRuntime, type EngineCapability } from '../engine'
 import { createEngineSimPreviewCapability, createEngineStatsCapability } from './capabilities'
 import { resolveEngineCapabilityDefaultEnabled, runtimeConfig } from '../config'
@@ -37,7 +39,13 @@ type PoseStoreEngineCapabilityStatus = {
 const poseStoreEngineCapabilityDefinitions = new Map<string, PoseStoreEngineCapabilityDefinition>()
 
 function getPoseStoreCommandPort(): AppCommandPort {
-  const state = usePoseStore.getState()
+  // Use modular stores instead of poseStore
+  const sceneStore = useSceneStore.getState()
+  const viewportStore = useViewportStore.getState()
+  const bridgeStore = useBridgeStore.getState()
+  const avatarStore = useAvatarStore.getState()
+  const uiStore = useUiStore.getState()
+
   const toSceneEngineMeta = (envelope?: AppCommandEnvelope) => {
     if (!envelope) return undefined
     return {
@@ -47,59 +55,57 @@ function getPoseStoreCommandPort(): AppCommandPort {
       source: envelope.source,
     }
   }
+
   return {
-    applyDeferredSceneRemote: state.applyDeferredSceneRemote,
+    applyDeferredSceneRemote: () => bridgeService.applyDeferredQueue(),
     applyWorkspaceLayoutPreset: (preset) => {
       dispatchWorkspaceShellCommand({
         kind: 'apply_layout_preset',
         preset,
       })
     },
-    clearScene: (envelope) => state.clearScene(toSceneEngineMeta(envelope)),
-    clearSceneDeferredRemote: state.clearSceneDeferredRemote,
-    clearSceneEventLog: state.clearSceneEventLog,
-    clearSceneRemoteOverride: state.clearSceneRemoteOverride,
-    redoSceneEdit: (envelope) => state.redoSceneEdit(toSceneEngineMeta(envelope)),
+    clearScene: (envelope) => sceneService.clearScene(toSceneEngineMeta(envelope)),
+    clearSceneDeferredRemote: () => bridgeStore.clearSceneDeferredRemote(),
+    clearSceneEventLog: () => uiStore.clearSceneEventLog(),
+    clearSceneRemoteOverride: () => bridgeStore.clearSceneRemoteOverride(),
+    redoSceneEdit: (envelope) => sceneService.redo(toSceneEngineMeta(envelope)),
     requestEngineSimPreview: () => {
-      const current = usePoseStore.getState()
-      current.appendSceneEvent({
+      uiStore.appendSceneEvent({
         kind: 'engine_sim_preview_unavailable',
         level: 'warn',
         message: {
           reason: "capability 'engine.sim.preview' is disabled",
         },
-        revision: current.sceneRevision,
-        sceneId: current.sceneId,
-        sequence: current.sceneSequence,
+        revision: sceneStore.sceneRevision,
+        sceneId: sceneStore.sceneId,
+        sequence: sceneStore.sceneSequence,
         source: 'frontend.engine_runtime',
         summary: "engine sim preview unavailable (enable capability 'engine.sim.preview')",
       })
     },
     requestEngineStats: () => {
-      const current = usePoseStore.getState()
-      current.appendSceneEvent({
+      uiStore.appendSceneEvent({
         kind: 'engine_stats_unavailable',
         level: 'warn',
         message: {
           reason: "capability 'engine.stats' is disabled",
         },
-        revision: current.sceneRevision,
-        sceneId: current.sceneId,
-        sequence: current.sceneSequence,
+        revision: sceneStore.sceneRevision,
+        sceneId: sceneStore.sceneId,
+        sequence: sceneStore.sceneSequence,
         source: 'frontend.engine_runtime',
         summary: "engine stats unavailable (enable capability 'engine.stats')",
       })
     },
-    resetPose: state.resetPose,
-    resetCameraOverlayFlip: state.resetCameraOverlayFlip,
-    rotateTopView: state.rotateTopView,
-    runSceneCommand: (command, envelope) => state.runSceneCommand(command, toSceneEngineMeta(envelope)),
-    setBridgeEnabled: state.setBridgeEnabled,
-    setCameraOverlayFlip: state.setCameraOverlayFlip,
+    resetPose: () => avatarStore.resetPose(),
+    resetCameraOverlayFlip: () => viewportStore.resetCameraOverlayFlip(),
+    rotateTopView: (direction) => viewportStore.rotateTopView(direction),
+    runSceneCommand: (command, envelope) => sceneService.runCommand(command, toSceneEngineMeta(envelope)),
+    setBridgeEnabled: (enabled) => bridgeStore.setBridgeEnabled(enabled),
+    setCameraOverlayFlip: (axis, enabled) => viewportStore.setCameraOverlayFlip(axis, enabled),
     setEngineCapabilityEnabled: (capabilityId, enabled) => {
       const outcome = setPoseStoreEngineCapabilityEnabled(capabilityId, enabled)
-      const current = usePoseStore.getState()
-      current.appendSceneEvent({
+      uiStore.appendSceneEvent({
         kind: outcome === 'not_found' ? 'engine_capability_unknown' : 'engine_capability_toggle',
         level: outcome === 'not_found' ? 'warn' : 'info',
         message: {
@@ -107,9 +113,9 @@ function getPoseStoreCommandPort(): AppCommandPort {
           enabled,
           outcome,
         },
-        revision: current.sceneRevision,
-        sceneId: current.sceneId,
-        sequence: current.sceneSequence,
+        revision: sceneStore.sceneRevision,
+        sceneId: sceneStore.sceneId,
+        sequence: sceneStore.sceneSequence,
         source: 'frontend.engine_runtime',
         summary:
           outcome === 'not_found'
@@ -117,18 +123,18 @@ function getPoseStoreCommandPort(): AppCommandPort {
             : `capability ${capabilityId} ${enabled ? 'enabled' : 'disabled'} (${outcome})`,
       })
     },
-    setCameraView: state.setCameraView,
-    setProjectionMode: state.setProjectionMode,
-    setSceneId: state.setSceneId,
-    setActiveToolMode: state.setActiveToolMode,
-    setSceneEventAutoScroll: state.setSceneEventAutoScroll,
-    setSceneEventLogPaused: state.setSceneEventLogPaused,
-    setSelectedMonitoringCameraId: state.setSelectedMonitoringCameraId,
-    setSelectedPlacementId: state.setSelectedPlacementId,
-    setShowDimensions: state.setShowDimensions,
-    toggleSceneEdit: state.toggleSceneEdit,
-    toggleSceneEventTerminal: state.toggleSceneEventTerminal,
-    toggleSceneRemoteHold: state.toggleSceneRemoteHold,
+    setCameraView: (view) => viewportStore.setCameraView(view),
+    setProjectionMode: (mode) => viewportStore.setProjectionMode(mode),
+    setSceneId: (sceneId) => sceneStore.setSceneId(sceneId),
+    setActiveToolMode: (mode) => uiStore.setActiveToolMode(mode),
+    setSceneEventAutoScroll: (enabled) => uiStore.setSceneEventAutoScroll(enabled),
+    setSceneEventLogPaused: (enabled) => uiStore.setSceneEventLogPaused(enabled),
+    setSelectedMonitoringCameraId: (cameraId) => viewportStore.setSelectedMonitoringCameraId(cameraId),
+    setSelectedPlacementId: (placementId) => sceneStore.setSelectedPlacementId(placementId),
+    setShowDimensions: (show) => viewportStore.setShowDimensions(show),
+    toggleSceneEdit: () => sceneStore.toggleSceneEdit(),
+    toggleSceneEventTerminal: () => uiStore.toggleSceneEventTerminal(),
+    toggleSceneRemoteHold: () => bridgeStore.toggleSceneRemoteHold(),
     toggleWorkspaceLeftPanel: () => {
       dispatchWorkspaceShellCommand({ kind: 'toggle_left_panel' })
     },
@@ -144,7 +150,7 @@ function getPoseStoreCommandPort(): AppCommandPort {
     toggleWorkspaceWidgetPinned: (widget) => {
       dispatchWorkspaceShellCommand({ kind: 'toggle_widget_pinned', widget })
     },
-    undoSceneEdit: (envelope) => state.undoSceneEdit(toSceneEngineMeta(envelope)),
+    undoSceneEdit: (envelope) => sceneService.undo(toSceneEngineMeta(envelope)),
     restoreWorkspaceLayoutDefaults: () => {
       dispatchWorkspaceShellCommand({ kind: 'restore_layout_defaults' })
     },
@@ -156,22 +162,24 @@ const poseStoreEngineRuntime = createEngineRuntime<AppCommand, PoseStoreEngineCa
     dispatchAppCommandEnvelope(getPoseStoreCommandPort(), envelope)
   },
   emitEvent: (event) => {
-    const state = usePoseStore.getState()
-    state.appendSceneEvent({
+    const sceneStore = useSceneStore.getState()
+    const uiStore = useUiStore.getState()
+    uiStore.appendSceneEvent({
       kind: 'engine_runtime_event',
       level: 'debug',
       message: event,
-      revision: state.sceneRevision,
-      sceneId: state.sceneId,
-      sequence: state.sceneSequence,
+      revision: sceneStore.sceneRevision,
+      sceneId: sceneStore.sceneId,
+      sequence: sceneStore.sceneSequence,
       source: 'frontend.engine_runtime',
       summary: `engine ${event.kind} (${event.source})`,
     })
   },
   getState: () => usePoseStore.getState(),
   onCapabilityError: ({ capabilityId, command, error }) => {
-    const state = usePoseStore.getState()
-    state.appendSceneEvent({
+    const sceneStore = useSceneStore.getState()
+    const uiStore = useUiStore.getState()
+    uiStore.appendSceneEvent({
       kind: 'engine_capability_error',
       level: 'warn',
       message: {
@@ -179,9 +187,9 @@ const poseStoreEngineRuntime = createEngineRuntime<AppCommand, PoseStoreEngineCa
         commandKind: command.kind,
         error: error instanceof Error ? error.message : String(error),
       },
-      revision: state.sceneRevision,
-      sceneId: state.sceneId,
-      sequence: state.sceneSequence,
+      revision: sceneStore.sceneRevision,
+      sceneId: sceneStore.sceneId,
+      sequence: sceneStore.sceneSequence,
       source: 'frontend.engine_runtime',
       summary: `capability ${capabilityId} failed on ${command.kind}`,
     })
@@ -204,8 +212,9 @@ function registerDefaultPoseStoreEngineCapabilities() {
     id: 'engine.sim.preview',
   })
 
-  const state = usePoseStore.getState()
-  state.appendSceneEvent({
+  const sceneStore = useSceneStore.getState()
+  const uiStore = useUiStore.getState()
+  uiStore.appendSceneEvent({
     kind: 'engine_capability_policy',
     level: 'info',
     message: {
@@ -213,9 +222,9 @@ function registerDefaultPoseStoreEngineCapabilities() {
       engineCapabilitiesDisabled: runtimeConfig.engineCapabilitiesDisabled,
       engineCapabilitiesEnabled: runtimeConfig.engineCapabilitiesEnabled,
     },
-    revision: state.sceneRevision,
-    sceneId: state.sceneId,
-    sequence: state.sceneSequence,
+    revision: sceneStore.sceneRevision,
+    sceneId: sceneStore.sceneId,
+    sequence: sceneStore.sceneSequence,
     source: 'frontend.engine_runtime',
     summary: `cap profile=${runtimeConfig.engineCapabilityProfile}`,
   })
@@ -288,20 +297,22 @@ export function dispatchPoseStoreCommand(
     correlationId: options?.correlationId ?? null,
     source,
   })
-  const state = usePoseStore.getState()
-  state.appendSceneEvent({
+  const sceneStore = useSceneStore.getState()
+  const uiStore = useUiStore.getState()
+
+  uiStore.appendSceneEvent({
     kind: 'app_command',
     level: 'debug',
     message: envelope,
-    revision: state.sceneRevision,
-    sceneId: state.sceneId,
-    sequence: state.sceneSequence,
+    revision: sceneStore.sceneRevision,
+    sceneId: sceneStore.sceneId,
+    sequence: sceneStore.sceneSequence,
     source: 'frontend.command_bus',
     summary: `cmd ${command.kind} from ${envelope.source}`,
   })
   const reflectedCommand = reflectAppCommandToTerminalLine(command)
   if (reflectedCommand && !source.startsWith('ui.event_terminal')) {
-    state.appendSceneEvent({
+    uiStore.appendSceneEvent({
       kind: 'command_line_reflection',
       level: 'info',
       message: {
@@ -309,9 +320,9 @@ export function dispatchPoseStoreCommand(
         line: reflectedCommand,
         source,
       },
-      revision: state.sceneRevision,
-      sceneId: state.sceneId,
-      sequence: state.sceneSequence,
+      revision: sceneStore.sceneRevision,
+      sceneId: sceneStore.sceneId,
+      sequence: sceneStore.sceneSequence,
       source: 'frontend.command_line',
       summary: `ui> ${reflectedCommand}`,
     })

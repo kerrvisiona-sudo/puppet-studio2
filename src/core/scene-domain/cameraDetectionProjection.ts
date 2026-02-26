@@ -1,4 +1,4 @@
-import type { DetectionBox2D } from '../../planogram'
+import type { DetectionBox2D } from '../../core/planogram-domain'
 
 type DetectionBoxLike = Pick<DetectionBox2D, 'anchorMode' | 'anchorUV' | 'height' | 'width' | 'x' | 'y'>
 

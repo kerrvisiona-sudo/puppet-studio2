@@ -1,4 +1,4 @@
-import type { Placement } from '../../planogram'
+import type { Placement } from '../../core/planogram-domain'
 
 export type ScenePatchPayload = {
   removes?: string[]

@@ -1,7 +1,7 @@
-import { ASSET_CATALOG } from '../../planogram/catalog'
-import { metersToWorld } from '../../planogram/layout'
-import { getPlacementTargetSizeM } from '../../planogram/sync'
-import type { Placement, RoomDefinition } from '../../planogram/types'
+import { ASSET_CATALOG } from '../planogram-domain/catalog'
+import { metersToWorld } from '../planogram-domain/layout'
+import { getPlacementTargetSizeM } from '../planogram-domain/sync'
+import type { Placement, RoomDefinition } from '../planogram-domain/types'
 
 export type PlanPoint2D = [number, number]
 

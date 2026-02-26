@@ -1,43 +1,50 @@
 import { useEffect, useState } from 'react'
 
-import { usePoseStore } from '../../../app/state'
+import { useAvatarStore, useBridgeStore, useSceneStore, useUiStore } from '../../../app/state'
 import { createPoseStoreCommandDispatcher } from '../../../shared/ui'
 
 export function usePoseControlPanelState() {
-  const pose = usePoseStore((state) => state.pose)
-  const bridgeEnabled = usePoseStore((state) => state.bridgeEnabled)
-  const bridgeError = usePoseStore((state) => state.bridgeError)
-  const bridgeLastPoseAt = usePoseStore((state) => state.bridgeLastPoseAt)
-  const bridgeNonZeroAxes = usePoseStore((state) => state.bridgeNonZeroAxes)
-  const bridgeSequence = usePoseStore((state) => state.bridgeSequence)
-  const bridgeStatus = usePoseStore((state) => state.bridgeStatus)
-  const bridgeUrl = usePoseStore((state) => state.bridgeUrl)
-  const sceneError = usePoseStore((state) => state.sceneError)
-  const sceneLastEventAt = usePoseStore((state) => state.sceneLastEventAt)
-  const scenePlacements = usePoseStore((state) => state.scenePlacements)
-  const sceneRevision = usePoseStore((state) => state.sceneRevision)
-  const sceneRemoteOverrideAt = usePoseStore((state) => state.sceneRemoteOverrideAt)
-  const sceneRemoteOverrideKind = usePoseStore((state) => state.sceneRemoteOverrideKind)
-  const sceneRemoteHoldEnabled = usePoseStore((state) => state.sceneRemoteHoldEnabled)
-  const sceneDeferredRemoteCount = usePoseStore((state) => state.sceneDeferredRemoteCount)
-  const sceneDeferredApplyPendingConfirm = usePoseStore((state) => state.sceneDeferredApplyPendingConfirm)
-  const sceneDeferredRemoteLastAt = usePoseStore((state) => state.sceneDeferredRemoteLastAt)
-  const sceneDeferredRemoteLastKind = usePoseStore((state) => state.sceneDeferredRemoteLastKind)
-  const sceneSequence = usePoseStore((state) => state.sceneSequence)
-  const sceneSource = usePoseStore((state) => state.sceneSource)
-  const sceneRedoDepth = usePoseStore((state) => state.sceneRedoDepth)
-  const sceneId = usePoseStore((state) => state.sceneId)
-  const sceneEventTerminalOpen = usePoseStore((state) => state.sceneEventTerminalOpen)
-  const sceneSpecialistSource = usePoseStore((state) => state.sceneSpecialistSource)
-  const sceneSpecialistGeneratedAt = usePoseStore((state) => state.sceneSpecialistGeneratedAt)
-  const sceneSpatialFresh = usePoseStore((state) => state.sceneSpatialFresh)
-  const sceneSpatialAgeS = usePoseStore((state) => state.sceneSpatialAgeS)
-  const sceneSpatialStaleAfterS = usePoseStore((state) => state.sceneSpatialStaleAfterS)
-  const sceneSpatialStalePolicy = usePoseStore((state) => state.sceneSpatialStalePolicy)
-  const sceneUndoDepth = usePoseStore((state) => state.sceneUndoDepth)
-  const sceneEditEnabled = usePoseStore((state) => state.sceneEditEnabled)
-  const setBridgeUrl = usePoseStore((state) => state.setBridgeUrl)
-  const setAxis = usePoseStore((state) => state.setAxis)
+  // Avatar state
+  const pose = useAvatarStore((state) => state.pose)
+  const setAxis = useAvatarStore((state) => state.setAxis)
+
+  // Bridge state
+  const bridgeEnabled = useBridgeStore((state) => state.bridgeEnabled)
+  const bridgeError = useBridgeStore((state) => state.bridgeError)
+  const bridgeLastPoseAt = useBridgeStore((state) => state.bridgeLastPoseAt)
+  const bridgeNonZeroAxes = useBridgeStore((state) => state.bridgeNonZeroAxes)
+  const bridgeSequence = useBridgeStore((state) => state.bridgeSequence)
+  const bridgeStatus = useBridgeStore((state) => state.bridgeStatus)
+  const bridgeUrl = useBridgeStore((state) => state.bridgeUrl)
+  const sceneRemoteOverrideAt = useBridgeStore((state) => state.sceneRemoteOverrideAt)
+  const sceneRemoteOverrideKind = useBridgeStore((state) => state.sceneRemoteOverrideKind)
+  const sceneRemoteHoldEnabled = useBridgeStore((state) => state.sceneRemoteHoldEnabled)
+  const sceneDeferredRemoteCount = useBridgeStore((state) => state.sceneDeferredRemoteCount)
+  const sceneDeferredApplyPendingConfirm = useBridgeStore((state) => state.sceneDeferredApplyPendingConfirm)
+  const sceneDeferredRemoteLastAt = useBridgeStore((state) => state.sceneDeferredRemoteLastAt)
+  const sceneDeferredRemoteLastKind = useBridgeStore((state) => state.sceneDeferredRemoteLastKind)
+  const setBridgeUrl = useBridgeStore((state) => state.setBridgeUrl)
+
+  // Scene state
+  const sceneError = useSceneStore((state) => state.sceneError)
+  const sceneLastEventAt = useSceneStore((state) => state.sceneLastEventAt)
+  const scenePlacements = useSceneStore((state) => state.scenePlacements)
+  const sceneRevision = useSceneStore((state) => state.sceneRevision)
+  const sceneSequence = useSceneStore((state) => state.sceneSequence)
+  const sceneSource = useSceneStore((state) => state.sceneSource)
+  const sceneRedoDepth = useSceneStore((state) => state.sceneRedoDepth)
+  const sceneId = useSceneStore((state) => state.sceneId)
+  const sceneSpecialistSource = useSceneStore((state) => state.sceneSpecialistSource)
+  const sceneSpecialistGeneratedAt = useSceneStore((state) => state.sceneSpecialistGeneratedAt)
+  const sceneSpatialFresh = useSceneStore((state) => state.sceneSpatialFresh)
+  const sceneSpatialAgeS = useSceneStore((state) => state.sceneSpatialAgeS)
+  const sceneSpatialStaleAfterS = useSceneStore((state) => state.sceneSpatialStaleAfterS)
+  const sceneSpatialStalePolicy = useSceneStore((state) => state.sceneSpatialStalePolicy)
+  const sceneUndoDepth = useSceneStore((state) => state.sceneUndoDepth)
+  const sceneEditEnabled = useSceneStore((state) => state.sceneEditEnabled)
+
+  // UI state
+  const sceneEventTerminalOpen = useUiStore((state) => state.sceneEventTerminalOpen)
 
   const [sceneDraft, setSceneDraft] = useState(sceneId)
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 
-import { usePoseStore } from '../../../app/state'
+import { useBridgeStore, useSceneStore, useAvatarStore, useUiStore } from '../../../app/state'
+import { bridgeService } from '../../../services'
 import {
   applyBridgeStateActions,
   BridgeSession,
@@ -8,6 +9,7 @@ import {
   parseBridgeInboundMessage,
   setBridgeOutboundObserver,
   setBridgeOutboundSender,
+  type BridgeStatePort,
 } from '../../../core/bridge-runtime'
 import { inferSceneEventSource, summarizeSceneEvent } from '../../../core/observability'
 import { toBridgeLifecycleSceneEvent } from '../model'
@@ -15,17 +17,27 @@ import { toBridgeLifecycleSceneEvent } from '../model'
 const RECONNECT_MS = 1200
 
 export function useBridgePoseListener() {
-  const bridgeEnabled = usePoseStore((state) => state.bridgeEnabled)
-  const bridgeUrl = usePoseStore((state) => state.bridgeUrl)
-  const sceneId = usePoseStore((state) => state.sceneId)
+  const bridgeEnabled = useBridgeStore((state) => state.bridgeEnabled)
+  const bridgeUrl = useBridgeStore((state) => state.bridgeUrl)
+  const sceneId = useSceneStore((state) => state.sceneId)
   const sessionRef = useRef<BridgeSession | null>(null)
   const previousEnabledRef = useRef<boolean | null>(null)
 
   useEffect(() => {
-    const appendEvent = usePoseStore.getState().appendSceneEvent
+    const appendEvent = useUiStore.getState().appendSceneEvent
+
+    // Create bridge state port using modular stores
+    const createBridgePort = (): BridgeStatePort => ({
+      applyPoseSnapshot: (payload) => useAvatarStore.getState().applyPoseSnapshot(payload),
+      applyScenePatch: (payload) => bridgeService.applyScenePatch(payload),
+      applySceneSnapshot: (payload) => bridgeService.applySceneSnapshot(payload),
+      setBridgeError: (error) => useBridgeStore.getState().setBridgeError(error),
+      setBridgeMeta: (meta) => useBridgeStore.getState().setBridgeMeta(meta),
+    })
+
     const session = new BridgeSession({
       onError: (error) => {
-        usePoseStore.getState().setBridgeError(error)
+        useBridgeStore.getState().setBridgeError(error)
       },
       onInboundPayload: (payload) => {
         const parsed = parseBridgeInboundMessage(payload)
@@ -52,13 +64,13 @@ export function useBridgePoseListener() {
 
         const actions = mapParsedBridgeInboundToActions(parsed)
         if (actions.length <= 0) return
-        applyBridgeStateActions(usePoseStore.getState(), actions)
+        applyBridgeStateActions(createBridgePort(), actions)
       },
       onLifecycle: (event) => {
         appendEvent(toBridgeLifecycleSceneEvent(event))
       },
       onStatus: (status) => {
-        usePoseStore.getState().setBridgeStatus(status)
+        useBridgeStore.getState().setBridgeStatus(status)
       },
       reconnectMs: RECONNECT_MS,
     })
@@ -82,7 +94,7 @@ export function useBridgePoseListener() {
       previousEnabledRef.current = null
       setBridgeOutboundObserver(null)
       setBridgeOutboundSender(null)
-      usePoseStore.getState().setBridgeStatus('disconnected')
+      useBridgeStore.getState().setBridgeStatus('disconnected')
     }
   }, [])
 
@@ -96,7 +108,7 @@ export function useBridgePoseListener() {
     if (!bridgeEnabled) {
       session.setEnabled(false)
       if (previousEnabledRef.current !== false) {
-        usePoseStore.getState().appendSceneEvent({
+        useUiStore.getState().appendSceneEvent({
           kind: 'bridge_disabled',
           level: 'info',
           source: 'bridge.lifecycle',

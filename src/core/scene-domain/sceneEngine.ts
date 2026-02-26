@@ -1,5 +1,5 @@
-import { clonePlacements } from '../../planogram'
-import type { Placement, RoomDefinition } from '../../planogram'
+import { clonePlacements } from '../../core/planogram-domain'
+import type { Placement, RoomDefinition } from '../../core/planogram-domain'
 import type { SceneCommand, SceneConstraintZone } from './sceneCommands'
 import { applySceneCommand } from './sceneCommands'
 

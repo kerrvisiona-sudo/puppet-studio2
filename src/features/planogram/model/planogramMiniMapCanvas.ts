@@ -5,8 +5,8 @@ import {
   getPlacementTargetSizeM,
   TARGET_AVATAR_FOOTPRINT_DEPTH_M,
   TARGET_AVATAR_FOOTPRINT_WIDTH_M,
-} from '../../../planogram'
-import type { Placement, RoomDefinition } from '../../../planogram'
+} from '../../../core/planogram-domain'
+import type { Placement, RoomDefinition } from '../../../core/planogram-domain'
 import {
   createPlanTransform,
   getPlacementFootprintCorners,

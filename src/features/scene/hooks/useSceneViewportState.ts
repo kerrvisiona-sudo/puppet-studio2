@@ -1,23 +1,28 @@
 import { useMemo } from 'react'
 
-import { usePoseStore } from '../../../app/state'
+import { useViewportStore, useSceneStore, useAvatarStore } from '../../../app/state'
 import { selectMonitoringCamera } from '../../../core/scene-domain'
 import { buildAvatarWorldTransform } from '../model'
 
 export function useSceneViewportState() {
-  const avatarPlanPositionM = usePoseStore((state) => state.avatarPlanPositionM)
-  const avatarRotationDeg = usePoseStore((state) => state.avatarRotationDeg)
-  const cameraDetectionOverlays = usePoseStore((state) => state.cameraDetectionOverlays)
-  const cameraOverlayFlipX = usePoseStore((state) => state.cameraOverlayFlipX)
-  const cameraOverlayFlipY = usePoseStore((state) => state.cameraOverlayFlipY)
-  const cameraView = usePoseStore((state) => state.cameraView)
-  const monitoringCameras = usePoseStore((state) => state.monitoringCameras)
-  const scenePlacements = usePoseStore((state) => state.scenePlacements)
-  const sceneRoom = usePoseStore((state) => state.sceneRoom)
-  const projectionMode = usePoseStore((state) => state.projectionMode)
-  const selectedMonitoringCameraId = usePoseStore((state) => state.selectedMonitoringCameraId)
-  const topQuarterTurns = usePoseStore((state) => state.topQuarterTurns)
-  const pose = usePoseStore((state) => state.pose)
+  // Avatar state
+  const avatarPlanPositionM = useAvatarStore((state) => state.avatarPlanPositionM)
+  const avatarRotationDeg = useAvatarStore((state) => state.avatarRotationDeg)
+  const pose = useAvatarStore((state) => state.pose)
+
+  // Scene state
+  const cameraDetectionOverlays = useSceneStore((state) => state.cameraDetectionOverlays)
+  const monitoringCameras = useSceneStore((state) => state.monitoringCameras)
+  const scenePlacements = useSceneStore((state) => state.scenePlacements)
+  const sceneRoom = useSceneStore((state) => state.sceneRoom)
+
+  // Viewport state
+  const cameraOverlayFlipX = useViewportStore((state) => state.cameraOverlayFlipX)
+  const cameraOverlayFlipY = useViewportStore((state) => state.cameraOverlayFlipY)
+  const cameraView = useViewportStore((state) => state.cameraView)
+  const projectionMode = useViewportStore((state) => state.projectionMode)
+  const selectedMonitoringCameraId = useViewportStore((state) => state.selectedMonitoringCameraId)
+  const topQuarterTurns = useViewportStore((state) => state.topQuarterTurns)
 
   const avatarWorldTransform = useMemo(
     () => buildAvatarWorldTransform(avatarPlanPositionM, avatarRotationDeg),

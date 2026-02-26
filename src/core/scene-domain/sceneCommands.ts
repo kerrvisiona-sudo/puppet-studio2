@@ -1,4 +1,4 @@
-import type { Placement, RoomDefinition } from '../../planogram'
+import type { Placement, RoomDefinition } from '../../core/planogram-domain'
 import {
   clampPlacementToRoom,
   getPlacementBoundsRect,

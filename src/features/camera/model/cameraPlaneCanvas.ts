@@ -1,5 +1,5 @@
 import { normalizeDetectionBox2D, projectNormalizedDetectionToFrame } from '../../../core/scene-domain'
-import type { CameraDetectionOverlay, MonitoringCameraDefinition } from '../../../planogram'
+import type { CameraDetectionOverlay, MonitoringCameraDefinition } from '../../../core/planogram-domain'
 
 export const CAMERA_PANEL_WIDTH = 280
 export const CAMERA_PANEL_HEIGHT = 170

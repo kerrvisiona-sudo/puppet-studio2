@@ -4,7 +4,7 @@ import {
   GRID_MAJOR_STEP_M,
   GRID_MINOR_STEP_M,
   TOP_VIEW_TARGET_PX_PER_M,
-} from '../../../planogram'
+} from '../../../core/planogram-domain'
 import {
   runtimeConfig,
   SCENE_COMMAND_MOVE_STEP_M,

@@ -1,5 +1,5 @@
-import { ASSET_CATALOG, getPlacementTargetSizeM } from '../../planogram'
-import type { MonitoringCameraDefinition, Placement } from '../../planogram'
+import { ASSET_CATALOG, getPlacementTargetSizeM } from '../../core/planogram-domain'
+import type { MonitoringCameraDefinition, Placement } from '../../core/planogram-domain'
 
 export type SelectedPlacementView = {
   asset: (typeof ASSET_CATALOG)[keyof typeof ASSET_CATALOG] | null

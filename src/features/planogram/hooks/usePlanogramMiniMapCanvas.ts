@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { RefObject } from 'react'
 
-import type { Placement, RoomDefinition } from '../../../planogram'
+import type { Placement, RoomDefinition } from '../../../core/planogram-domain'
 import type { QuarterTurns, SceneConstraintZone } from '../../../core/scene-domain'
 import {
   drawPlanogramGridReference,

@@ -1,5 +1,5 @@
-import { TOP_VIEW_PADDING_M, TOP_VIEW_TARGET_PX_PER_M, WORLD_UNITS_PER_METER } from '../../planogram'
-import type { MonitoringCameraDefinition, RoomDefinition } from '../../planogram'
+import { TOP_VIEW_PADDING_M, TOP_VIEW_TARGET_PX_PER_M, WORLD_UNITS_PER_METER } from '../../core/planogram-domain'
+import type { MonitoringCameraDefinition, RoomDefinition } from '../../core/planogram-domain'
 import { degToRad, planToWorldPosition } from './sceneGeometry'
 
 export type QuarterTurns = 0 | 1 | 2 | 3

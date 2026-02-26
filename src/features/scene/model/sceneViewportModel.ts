@@ -1,5 +1,5 @@
 import { planToWorldPosition } from '../../../core/scene-domain'
-import { degToRad } from '../../../planogram'
+import { degToRad } from '../../../core/planogram-domain'
 
 export type AvatarWorldTransform = {
   position: [number, number, number]
