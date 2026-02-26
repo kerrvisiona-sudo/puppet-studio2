@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 import { useSceneStore, useUiStore, useBridgeStore, useViewportStore, useTerminalUiStore } from '../../../app/state'
 import { listPoseStoreEngineCapabilities } from '../../../core/app-commanding'
@@ -17,57 +18,130 @@ import {
 } from '../model'
 
 export function useSceneEventTerminalState() {
-  // UI state
-  const activeToolMode = useUiStore((state) => state.activeToolMode)
-  const sceneEventAutoScroll = useUiStore((state) => state.sceneEventAutoScroll)
-  const sceneEventDroppedWhilePaused = useUiStore((state) => state.sceneEventDroppedWhilePaused)
-  const sceneEventLog = useUiStore((state) => state.sceneEventLog)
-  const sceneEventLogPaused = useUiStore((state) => state.sceneEventLogPaused)
-  const sceneEventTerminalOpen = useUiStore((state) => state.sceneEventTerminalOpen)
+  // Group 1: UI state (6 props)
+  const {
+    activeToolMode,
+    sceneEventAutoScroll,
+    sceneEventDroppedWhilePaused,
+    sceneEventLog,
+    sceneEventLogPaused,
+    sceneEventTerminalOpen,
+  } = useUiStore(
+    useShallow((s) => ({
+      activeToolMode: s.activeToolMode,
+      sceneEventAutoScroll: s.sceneEventAutoScroll,
+      sceneEventDroppedWhilePaused: s.sceneEventDroppedWhilePaused,
+      sceneEventLog: s.sceneEventLog,
+      sceneEventLogPaused: s.sceneEventLogPaused,
+      sceneEventTerminalOpen: s.sceneEventTerminalOpen,
+    }))
+  )
 
-  // Scene state
-  const sceneEditEnabled = useSceneStore((state) => state.sceneEditEnabled)
-  const sceneId = useSceneStore((state) => state.sceneId)
+  // Group 2: Scene state (2 props)
+  const { sceneEditEnabled, sceneId } = useSceneStore(
+    useShallow((s) => ({
+      sceneEditEnabled: s.sceneEditEnabled,
+      sceneId: s.sceneId,
+    }))
+  )
 
-  // Bridge state
-  const sceneRemoteHoldEnabled = useBridgeStore((state) => state.sceneRemoteHoldEnabled)
+  // Group 3: Bridge state (1 prop)
+  const sceneRemoteHoldEnabled = useBridgeStore((s) => s.sceneRemoteHoldEnabled)
 
-  // Viewport state
-  const showDimensions = useViewportStore((state) => state.showDimensions)
+  // Group 4: Viewport state (1 prop)
+  const showDimensions = useViewportStore((s) => s.showDimensions)
 
-  // Terminal UI state (from dedicated store)
-  const sourceFilter = useTerminalUiStore((state) => state.sourceFilter)
-  const kindFilter = useTerminalUiStore((state) => state.kindFilter)
-  const sceneFilter = useTerminalUiStore((state) => state.sceneFilter)
-  const levelFilter = useTerminalUiStore((state) => state.levelFilter)
-  const searchFilter = useTerminalUiStore((state) => state.searchFilter)
-  const selectedEventId = useTerminalUiStore((state) => state.selectedEventId)
-  const commandInput = useTerminalUiStore((state) => state.commandInput)
-  const commandHistory = useTerminalUiStore((state) => state.commandHistory)
-  const commandHistoryExpanded = useTerminalUiStore((state) => state.commandHistoryExpanded)
-  const commandHistoryCursor = useTerminalUiStore((state) => state.commandHistoryCursor)
-  const commandPaletteOpen = useTerminalUiStore((state) => state.commandPaletteOpen)
-  const commandPaletteQuery = useTerminalUiStore((state) => state.commandPaletteQuery)
-  const commandPaletteSelectedIndex = useTerminalUiStore((state) => state.commandPaletteSelectedIndex)
-  const commandSuggestionCursor = useTerminalUiStore((state) => state.commandSuggestionCursor)
-  const dynamicInputEnabled = useTerminalUiStore((state) => state.dynamicInputEnabled)
+  // Group 5: Terminal filters (5 props)
+  const {
+    sourceFilter,
+    kindFilter,
+    sceneFilter,
+    levelFilter,
+    searchFilter,
+  } = useTerminalUiStore(
+    useShallow((s) => ({
+      sourceFilter: s.sourceFilter,
+      kindFilter: s.kindFilter,
+      sceneFilter: s.sceneFilter,
+      levelFilter: s.levelFilter,
+      searchFilter: s.searchFilter,
+    }))
+  )
 
-  const setSourceFilter = useTerminalUiStore((state) => state.setSourceFilter)
-  const setKindFilter = useTerminalUiStore((state) => state.setKindFilter)
-  const setSceneFilter = useTerminalUiStore((state) => state.setSceneFilter)
-  const setLevelFilter = useTerminalUiStore((state) => state.setLevelFilter)
-  const setSearchFilter = useTerminalUiStore((state) => state.setSearchFilter)
-  const setSelectedEventId = useTerminalUiStore((state) => state.setSelectedEventId)
-  const setCommandInput = useTerminalUiStore((state) => state.setCommandInput)
-  const setCommandHistoryExpanded = useTerminalUiStore((state) => state.setCommandHistoryExpanded)
-  const setCommandHistoryCursor = useTerminalUiStore((state) => state.setCommandHistoryCursor)
-  const setCommandPaletteOpen = useTerminalUiStore((state) => state.setCommandPaletteOpen)
-  const setCommandPaletteQuery = useTerminalUiStore((state) => state.setCommandPaletteQuery)
-  const setCommandPaletteSelectedIndex = useTerminalUiStore((state) => state.setCommandPaletteSelectedIndex)
-  const setCommandSuggestionCursor = useTerminalUiStore((state) => state.setCommandSuggestionCursor)
-  const setDynamicInputEnabled = useTerminalUiStore((state) => state.setDynamicInputEnabled)
-  const appendCommandHistory = useTerminalUiStore((state) => state.appendCommandHistory)
-  const resetCommandInput = useTerminalUiStore((state) => state.resetCommandInput)
+  // Group 6: Terminal event selection (1 prop)
+  const selectedEventId = useTerminalUiStore((s) => s.selectedEventId)
+
+  // Group 7: Terminal command input state (4 props)
+  const {
+    commandInput,
+    commandHistory,
+    commandHistoryCursor,
+    dynamicInputEnabled,
+  } = useTerminalUiStore(
+    useShallow((s) => ({
+      commandInput: s.commandInput,
+      commandHistory: s.commandHistory,
+      commandHistoryCursor: s.commandHistoryCursor,
+      dynamicInputEnabled: s.dynamicInputEnabled,
+    }))
+  )
+
+  // Group 8: Terminal command history UI (1 prop)
+  const commandHistoryExpanded = useTerminalUiStore((s) => s.commandHistoryExpanded)
+
+  // Group 9: Terminal command palette state (4 props)
+  const {
+    commandPaletteOpen,
+    commandPaletteQuery,
+    commandPaletteSelectedIndex,
+    commandSuggestionCursor,
+  } = useTerminalUiStore(
+    useShallow((s) => ({
+      commandPaletteOpen: s.commandPaletteOpen,
+      commandPaletteQuery: s.commandPaletteQuery,
+      commandPaletteSelectedIndex: s.commandPaletteSelectedIndex,
+      commandSuggestionCursor: s.commandSuggestionCursor,
+    }))
+  )
+
+  // Group 10: Terminal actions (16 actions - stable references, no shallow needed)
+  const {
+    setSourceFilter,
+    setKindFilter,
+    setSceneFilter,
+    setLevelFilter,
+    setSearchFilter,
+    setSelectedEventId,
+    setCommandInput,
+    setCommandHistoryExpanded,
+    setCommandHistoryCursor,
+    setCommandPaletteOpen,
+    setCommandPaletteQuery,
+    setCommandPaletteSelectedIndex,
+    setCommandSuggestionCursor,
+    setDynamicInputEnabled,
+    appendCommandHistory,
+    resetCommandInput,
+  } = useTerminalUiStore(
+    useShallow((s) => ({
+      setSourceFilter: s.setSourceFilter,
+      setKindFilter: s.setKindFilter,
+      setSceneFilter: s.setSceneFilter,
+      setLevelFilter: s.setLevelFilter,
+      setSearchFilter: s.setSearchFilter,
+      setSelectedEventId: s.setSelectedEventId,
+      setCommandInput: s.setCommandInput,
+      setCommandHistoryExpanded: s.setCommandHistoryExpanded,
+      setCommandHistoryCursor: s.setCommandHistoryCursor,
+      setCommandPaletteOpen: s.setCommandPaletteOpen,
+      setCommandPaletteQuery: s.setCommandPaletteQuery,
+      setCommandPaletteSelectedIndex: s.setCommandPaletteSelectedIndex,
+      setCommandSuggestionCursor: s.setCommandSuggestionCursor,
+      setDynamicInputEnabled: s.setDynamicInputEnabled,
+      appendCommandHistory: s.appendCommandHistory,
+      resetCommandInput: s.resetCommandInput,
+    }))
+  )
 
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const commandInputRef = useRef<HTMLInputElement | null>(null)

@@ -1,6 +1,7 @@
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { Suspense, useRef } from 'react'
+import { PCFShadowMap } from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 import { ASSET_CATALOG } from '../../../core/planogram-domain'
@@ -41,7 +42,7 @@ export function PuppetScene() {
           : { far: 120, fov: 42, near: 0.1, position: [8, 7.5, 8] }
       }
       orthographic={projectionMode === 'orthographic'}
-      shadows
+      shadows={{ type: PCFShadowMap }}
     >
       <color attach="background" args={['#f7f7f7']} />
 

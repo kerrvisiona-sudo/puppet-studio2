@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 import { useAvatarStore, useBridgeStore, useSceneStore, useViewportStore } from '../../../app/state'
 import {
@@ -13,40 +14,87 @@ import {
 } from '../model'
 
 export function usePlanogramMiniMapState() {
-  // Viewport state
-  const cameraView = useViewportStore((state) => state.cameraView)
-  const projectionMode = useViewportStore((state) => state.projectionMode)
-  const selectedMonitoringCameraId = useViewportStore((state) => state.selectedMonitoringCameraId)
-  const showDimensions = useViewportStore((state) => state.showDimensions)
-  const topQuarterTurns = useViewportStore((state) => state.topQuarterTurns)
+  // Group 1: Viewport state (5 props)
+  const {
+    cameraView,
+    projectionMode,
+    selectedMonitoringCameraId,
+    showDimensions,
+    topQuarterTurns,
+  } = useViewportStore(
+    useShallow((s) => ({
+      cameraView: s.cameraView,
+      projectionMode: s.projectionMode,
+      selectedMonitoringCameraId: s.selectedMonitoringCameraId,
+      showDimensions: s.showDimensions,
+      topQuarterTurns: s.topQuarterTurns,
+    }))
+  )
 
-  // Avatar state
-  const avatarPlanPositionM = useAvatarStore((state) => state.avatarPlanPositionM)
-  const avatarRotationDeg = useAvatarStore((state) => state.avatarRotationDeg)
-  const avatarTrackId = useAvatarStore((state) => state.avatarTrackId)
+  // Group 2: Avatar state (3 props)
+  const {
+    avatarPlanPositionM,
+    avatarRotationDeg,
+    avatarTrackId,
+  } = useAvatarStore(
+    useShallow((s) => ({
+      avatarPlanPositionM: s.avatarPlanPositionM,
+      avatarRotationDeg: s.avatarRotationDeg,
+      avatarTrackId: s.avatarTrackId,
+    }))
+  )
 
-  // Scene state
-  const sceneError = useSceneStore((state) => state.sceneError)
-  const sceneLastEventAt = useSceneStore((state) => state.sceneLastEventAt)
-  const scenePlacements = useSceneStore((state) => state.scenePlacements)
-  const sceneRevision = useSceneStore((state) => state.sceneRevision)
-  const sceneRoom = useSceneStore((state) => state.sceneRoom)
-  const sceneSequence = useSceneStore((state) => state.sceneSequence)
-  const sceneSource = useSceneStore((state) => state.sceneSource)
-  const sceneEditEnabled = useSceneStore((state) => state.sceneEditEnabled)
-  const selectedPlacementId = useSceneStore((state) => state.selectedPlacementId)
-  const sceneRedoDepth = useSceneStore((state) => state.sceneRedoDepth)
-  const sceneUndoDepth = useSceneStore((state) => state.sceneUndoDepth)
-  const monitoringCameras = useSceneStore((state) => state.monitoringCameras)
-  const sceneRemoteOverrideAt = useSceneStore((state) => state.sceneRemoteOverrideAt)
-  const sceneRemoteOverrideKind = useSceneStore((state) => state.sceneRemoteOverrideKind)
+  // Group 3: Scene state (14 props)
+  const {
+    sceneError,
+    sceneLastEventAt,
+    scenePlacements,
+    sceneRevision,
+    sceneRoom,
+    sceneSequence,
+    sceneSource,
+    sceneEditEnabled,
+    selectedPlacementId,
+    sceneRedoDepth,
+    sceneUndoDepth,
+    monitoringCameras,
+    sceneRemoteOverrideAt,
+    sceneRemoteOverrideKind,
+  } = useSceneStore(
+    useShallow((s) => ({
+      sceneError: s.sceneError,
+      sceneLastEventAt: s.sceneLastEventAt,
+      scenePlacements: s.scenePlacements,
+      sceneRevision: s.sceneRevision,
+      sceneRoom: s.sceneRoom,
+      sceneSequence: s.sceneSequence,
+      sceneSource: s.sceneSource,
+      sceneEditEnabled: s.sceneEditEnabled,
+      selectedPlacementId: s.selectedPlacementId,
+      sceneRedoDepth: s.sceneRedoDepth,
+      sceneUndoDepth: s.sceneUndoDepth,
+      monitoringCameras: s.monitoringCameras,
+      sceneRemoteOverrideAt: s.sceneRemoteOverrideAt,
+      sceneRemoteOverrideKind: s.sceneRemoteOverrideKind,
+    }))
+  )
 
-  // Bridge state
-  const sceneRemoteHoldEnabled = useBridgeStore((state) => state.sceneRemoteHoldEnabled)
-  const sceneDeferredRemoteCount = useBridgeStore((state) => state.sceneDeferredRemoteCount)
-  const sceneDeferredApplyPendingConfirm = useBridgeStore((state) => state.sceneDeferredApplyPendingConfirm)
-  const sceneDeferredRemoteLastAt = useBridgeStore((state) => state.sceneDeferredRemoteLastAt)
-  const sceneDeferredRemoteLastKind = useBridgeStore((state) => state.sceneDeferredRemoteLastKind)
+  // Group 4: Bridge state (5 props)
+  const {
+    sceneRemoteHoldEnabled,
+    sceneDeferredRemoteCount,
+    sceneDeferredApplyPendingConfirm,
+    sceneDeferredRemoteLastAt,
+    sceneDeferredRemoteLastKind,
+  } = useBridgeStore(
+    useShallow((s) => ({
+      sceneRemoteHoldEnabled: s.sceneRemoteHoldEnabled,
+      sceneDeferredRemoteCount: s.sceneDeferredRemoteCount,
+      sceneDeferredApplyPendingConfirm: s.sceneDeferredApplyPendingConfirm,
+      sceneDeferredRemoteLastAt: s.sceneDeferredRemoteLastAt,
+      sceneDeferredRemoteLastKind: s.sceneDeferredRemoteLastKind,
+    }))
+  )
 
   const selectedPlacementView = useMemo(
     () => selectSelectedPlacementView(scenePlacements, selectedPlacementId),
