@@ -1,1 +1,5 @@
 export * from './useSceneEventTerminalState'
+export * from './useTerminalFilters'
+export * from './useTerminalCommands'
+export * from './useTerminalKeyboard'
+export * from './useTerminalAutoScroll'

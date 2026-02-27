@@ -1,8 +1,5 @@
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 
-import { useSceneStore, useViewportStore, useBridgeStore, useUiStore } from '../../../../app/state'
-import { listPoseStoreEngineCapabilities } from '../../../../core/app-commanding'
 import type { WorkspaceWidgetId } from '../../../../core/workspace-shell'
 import {
   createAppCommandDispatcher,
@@ -12,7 +9,7 @@ import {
   IconSliders,
 } from '../../../../shared/ui'
 import { STUDIO_SHORTCUTS } from '../../../../shared/shortcuts'
-import { useWorkspaceHudState } from '../../hooks'
+import { useWorkspaceSelectors, useResizePanels } from '../../hooks'
 import { buildWorkspaceQuickActions } from '../../model'
 import {
   WORKSPACE_COMMAND_PALETTE_EVENT,
@@ -39,214 +36,88 @@ const SceneEventTerminal = lazy(() =>
   import('../../../terminal/ui/SceneEventTerminal').then((module) => ({ default: module.SceneEventTerminal })),
 )
 
-type ResizeKind = 'left' | 'right' | 'right_outliner' | 'terminal'
-
-type ResizeStart = {
-  kind: ResizeKind
-  pointerId: number
-  sizePx: number
-  x: number
-  y: number
-}
-
 export function CadWorkspacePage() {
-  // Bridge state
-  const bridgeStatus = useBridgeStore((state) => state.bridgeStatus)
-  const bridgeUrl = useBridgeStore((state) => state.bridgeUrl)
-  const sceneRemoteHoldEnabled = useBridgeStore((state) => state.sceneRemoteHoldEnabled)
+  const selectors = useWorkspaceSelectors()
+  const { beginResize } = useResizePanels({
+    leftPanelSizePx: selectors.leftPanelSizePx,
+    rightPanelSizePx: selectors.rightPanelSizePx,
+    rightPanelOutlinerHeightPx: selectors.rightPanelOutlinerHeightPx,
+    terminalHeightPx: selectors.terminalHeightPx,
+    setLeftPanelSize: selectors.setLeftPanelSize,
+    setRightPanelSize: selectors.setRightPanelSize,
+    setRightPanelOutlinerHeight: selectors.setRightPanelOutlinerHeight,
+    setTerminalHeight: selectors.setTerminalHeight,
+  })
 
-  // Viewport state
-  const cameraView = useViewportStore((state) => state.cameraView)
-  const viewportCameraQuaternion = useViewportStore((state) => state.viewportCameraQuaternion)
-  const projectionMode = useViewportStore((state) => state.projectionMode)
-  const showDimensions = useViewportStore((state) => state.showDimensions)
-
-  // Scene state
-  const monitoringCameraCount = useSceneStore((state) => state.monitoringCameras.length)
-  const sceneEditEnabled = useSceneStore((state) => state.sceneEditEnabled)
-  const sceneId = useSceneStore((state) => state.sceneId)
-  const scenePlacementsCount = useSceneStore((state) => state.scenePlacements.length)
-  const sceneRevision = useSceneStore((state) => state.sceneRevision)
-  const sceneSequence = useSceneStore((state) => state.sceneSequence)
-  const selectedPlacementId = useSceneStore((state) => state.selectedPlacementId)
-  const detectionCount = useSceneStore((state) =>
-    state.cameraDetectionOverlays.reduce((total, overlay) => total + overlay.boxes.length, 0),
-  )
-
-  // UI state
-  const sceneEventTerminalOpen = useUiStore((state) => state.sceneEventTerminalOpen)
-  const sceneEventLogCount = useUiStore((state) => state.sceneEventLog.length)
-  const activeTool = useUiStore((state) => state.activeToolMode)
-  const activeCapabilities = useMemo(
-    () => listPoseStoreEngineCapabilities().filter((capability) => capability.enabled).length,
-    [sceneEventLogCount],
-  )
-  const dispatchFromWorkspace = createAppCommandDispatcher('ui.workspace_shell')
-  const {
-    leftPanelSizePx,
-    leftPanelOpen,
-    rightPanelSizePx,
-    rightPanelOpen,
-    rightPanelOutlinerHeightPx,
-    showCameraWidget,
-    showOutlinerWidget,
-    showPropertiesWidget,
-    showPlanWidget,
-    terminalHeightPx,
-    setLeftPanelSize,
-    setRightPanelOutlinerHeight,
-    setRightPanelSize,
-    setTerminalHeight,
-    widgets,
-  } = useWorkspaceHudState()
-
-  const resizeStartRef = useRef<ResizeStart | null>(null)
   const [dockManagerOpen, setDockManagerOpen] = useState(false)
-
-  const openWorkspaceCommandPalette = useCallback(() => {
-    window.dispatchEvent(
-      new CustomEvent(WORKSPACE_COMMAND_PALETTE_EVENT, {
-        detail: { open: true },
-      }),
-    )
-  }, [])
-
-  const setWidgetVisibilityFromWorkspace = useCallback(
-    (widget: WorkspaceWidgetId, visible: boolean) => {
-      dispatchFromWorkspace({ kind: 'set_workspace_widget_visible', visible, widget })
-    },
-    [dispatchFromWorkspace],
-  )
-
-  const toggleWidgetCollapsedFromWorkspace = useCallback(
-    (widget: WorkspaceWidgetId) => {
-      dispatchFromWorkspace({ kind: 'toggle_workspace_widget_collapsed', widget })
-    },
-    [dispatchFromWorkspace],
-  )
-
-  const toggleWidgetPinnedFromWorkspace = useCallback(
-    (widget: WorkspaceWidgetId) => {
-      dispatchFromWorkspace({ kind: 'toggle_workspace_widget_pinned', widget })
-    },
-    [dispatchFromWorkspace],
-  )
-
-  const handleResizeMove = useCallback(
-    (event: PointerEvent) => {
-      const resizeStart = resizeStartRef.current
-      if (!resizeStart) return
-      if (resizeStart.pointerId !== event.pointerId) return
-
-      if (resizeStart.kind === 'left') {
-        const deltaX = event.clientX - resizeStart.x
-        setLeftPanelSize(resizeStart.sizePx + deltaX)
-        return
-      }
-      if (resizeStart.kind === 'right') {
-        const deltaX = event.clientX - resizeStart.x
-        setRightPanelSize(resizeStart.sizePx - deltaX)
-        return
-      }
-      if (resizeStart.kind === 'right_outliner') {
-        const deltaY = event.clientY - resizeStart.y
-        setRightPanelOutlinerHeight(resizeStart.sizePx + deltaY)
-        return
-      }
-      const deltaY = event.clientY - resizeStart.y
-      setTerminalHeight(resizeStart.sizePx - deltaY)
-    },
-    [setLeftPanelSize, setRightPanelOutlinerHeight, setRightPanelSize, setTerminalHeight],
-  )
-
-  const handleResizeEnd = useCallback(
-    (event: PointerEvent) => {
-      const resizeStart = resizeStartRef.current
-      if (!resizeStart || resizeStart.pointerId !== event.pointerId) return
-      resizeStartRef.current = null
-      window.removeEventListener('pointermove', handleResizeMove)
-      window.removeEventListener('pointerup', handleResizeEnd)
-    },
-    [handleResizeMove],
-  )
-
-  const beginResize = useCallback(
-    (kind: ResizeKind) => (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault()
-      const sizePx =
-        kind === 'left'
-          ? leftPanelSizePx
-          : kind === 'right'
-            ? rightPanelSizePx
-            : kind === 'right_outliner'
-              ? rightPanelOutlinerHeightPx
-              : terminalHeightPx
-      resizeStartRef.current = {
-        kind,
-        pointerId: event.pointerId,
-        sizePx,
-        x: event.clientX,
-        y: event.clientY,
-      }
-      window.addEventListener('pointermove', handleResizeMove)
-      window.addEventListener('pointerup', handleResizeEnd)
-    },
-    [
-      handleResizeEnd,
-      handleResizeMove,
-      leftPanelSizePx,
-      rightPanelOutlinerHeightPx,
-      rightPanelSizePx,
-      terminalHeightPx,
-    ],
-  )
+  const dispatchFromWorkspace = createAppCommandDispatcher('ui.workspace_shell')
 
   const quickActions = useMemo(
     () =>
       buildWorkspaceQuickActions(
         {
-          activeTool,
-          leftPanelOpen,
-          projectionMode,
-          rightPanelOpen,
-          sceneEditEnabled,
-          sceneEventTerminalOpen,
-          sceneRemoteHoldEnabled,
-          selectedPlacementId,
-          showDimensions,
-          widgets,
+          activeTool: selectors.activeTool,
+          leftPanelOpen: selectors.leftPanelOpen,
+          projectionMode: selectors.projectionMode,
+          rightPanelOpen: selectors.rightPanelOpen,
+          sceneEditEnabled: selectors.sceneEditEnabled,
+          sceneEventTerminalOpen: selectors.sceneEventTerminalOpen,
+          sceneRemoteHoldEnabled: selectors.sceneRemoteHoldEnabled,
+          selectedPlacementId: selectors.selectedPlacementId,
+          showDimensions: selectors.showDimensions,
+          widgets: selectors.widgets,
         },
         dispatchFromWorkspace,
       ),
     [
-      activeTool,
+      selectors.activeTool,
+      selectors.leftPanelOpen,
+      selectors.projectionMode,
+      selectors.rightPanelOpen,
+      selectors.sceneEditEnabled,
+      selectors.sceneEventTerminalOpen,
+      selectors.sceneRemoteHoldEnabled,
+      selectors.selectedPlacementId,
+      selectors.showDimensions,
+      selectors.widgets,
       dispatchFromWorkspace,
-      leftPanelOpen,
-      projectionMode,
-      rightPanelOpen,
-      sceneEditEnabled,
-      sceneEventTerminalOpen,
-      sceneRemoteHoldEnabled,
-      selectedPlacementId,
-      showDimensions,
-      widgets,
     ],
   )
 
-  const leftPanelWidthPx = widgets.properties.collapsed ? 220 : leftPanelSizePx
-  const anyRightWidgetVisible = showOutlinerWidget || showCameraWidget || showPlanWidget
-  const rightPanelWidthPx = widgets.outliner.collapsed ? Math.max(280, rightPanelSizePx - 40) : rightPanelSizePx
-  const outlinerHeightPx = widgets.outliner.collapsed ? 36 : rightPanelOutlinerHeightPx
-  const canSnapSelection = sceneEditEnabled && Boolean(selectedPlacementId)
+  const leftPanelWidthPx = selectors.widgets.properties.collapsed ? 220 : selectors.leftPanelSizePx
+  const anyRightWidgetVisible = selectors.showOutlinerWidget || selectors.showCameraWidget || selectors.showPlanWidget
+  const rightPanelWidthPx = selectors.widgets.outliner.collapsed ? Math.max(280, selectors.rightPanelSizePx - 40) : selectors.rightPanelSizePx
+  const outlinerHeightPx = selectors.widgets.outliner.collapsed ? 36 : selectors.rightPanelOutlinerHeightPx
+  const canSnapSelection = selectors.sceneEditEnabled && Boolean(selectors.selectedPlacementId)
+
+  const setWidgetVisibilityFromWorkspace = (widget: WorkspaceWidgetId, visible: boolean) => {
+    dispatchFromWorkspace({ kind: 'set_workspace_widget_visible', visible, widget })
+  }
+
+  const toggleWidgetCollapsedFromWorkspace = (widget: WorkspaceWidgetId) => {
+    dispatchFromWorkspace({ kind: 'toggle_workspace_widget_collapsed', widget })
+  }
+
+  const toggleWidgetPinnedFromWorkspace = (widget: WorkspaceWidgetId) => {
+    dispatchFromWorkspace({ kind: 'toggle_workspace_widget_pinned', widget })
+  }
+
+  const openWorkspaceCommandPalette = () => {
+    window.dispatchEvent(
+      new CustomEvent(WORKSPACE_COMMAND_PALETTE_EVENT, {
+        detail: { open: true },
+      }),
+    )
+  }
 
   return (
-    <div className={`cad-workspace ${sceneEventTerminalOpen ? 'terminal-open' : 'terminal-closed'}`}>
+    <div className={`cad-workspace ${selectors.sceneEventTerminalOpen ? 'terminal-open' : 'terminal-closed'}`}>
       <WorkspaceHeaderBar
-        activeCapabilities={activeCapabilities}
-        bridgeStatus={bridgeStatus}
-        cameraView={cameraView}
+        activeCapabilities={selectors.activeCapabilities}
+        bridgeStatus={selectors.bridgeStatus}
+        cameraView={selectors.cameraView}
         dockManagerOpen={dockManagerOpen}
-        leftPanelOpen={leftPanelOpen}
+        leftPanelOpen={selectors.leftPanelOpen}
         onApplyLayoutPreset={(preset) => dispatchFromWorkspace({ kind: 'apply_workspace_layout_preset', preset })}
         onOpenCommandPalette={openWorkspaceCommandPalette}
         onSetCameraView={(view) => dispatchFromWorkspace({ kind: 'set_camera_view', view })}
@@ -258,12 +129,12 @@ export function CadWorkspacePage() {
         onToggleSceneRemoteHold={() => dispatchFromWorkspace({ kind: 'toggle_scene_remote_hold' })}
         onToggleTerminal={() => dispatchFromWorkspace({ kind: 'toggle_scene_event_terminal' })}
         onRestoreLayoutDefaults={() => dispatchFromWorkspace({ kind: 'restore_workspace_layout_defaults' })}
-        projectionMode={projectionMode}
-        rightPanelOpen={rightPanelOpen}
-        sceneEditEnabled={sceneEditEnabled}
-        sceneEventTerminalOpen={sceneEventTerminalOpen}
-        sceneId={sceneId}
-        sceneRemoteHoldEnabled={sceneRemoteHoldEnabled}
+        projectionMode={selectors.projectionMode}
+        rightPanelOpen={selectors.rightPanelOpen}
+        sceneEditEnabled={selectors.sceneEditEnabled}
+        sceneEventTerminalOpen={selectors.sceneEventTerminalOpen}
+        sceneId={selectors.sceneId}
+        sceneRemoteHoldEnabled={selectors.sceneRemoteHoldEnabled}
       />
       {dockManagerOpen ? (
         <WorkspaceDockManager
@@ -271,19 +142,19 @@ export function CadWorkspacePage() {
           onSetWidgetVisible={setWidgetVisibilityFromWorkspace}
           onToggleWidgetCollapsed={toggleWidgetCollapsedFromWorkspace}
           onToggleWidgetPinned={toggleWidgetPinnedFromWorkspace}
-          widgets={widgets}
+          widgets={selectors.widgets}
         />
       ) : null}
 
       <main className="cad-workspace-main">
-        {showPropertiesWidget ? (
+        {selectors.showPropertiesWidget ? (
           <aside className="workspace-side workspace-side-left" style={{ width: `${leftPanelWidthPx}px` }}>
             <div className="workspace-side-content workspace-side-content-tight">
               <WorkspaceWidgetCard
-                collapsed={widgets.properties.collapsed}
+                collapsed={selectors.widgets.properties.collapsed}
                 icon={<IconSliders className="workspace-widget-head-icon" />}
                 label="Properties"
-                pinned={widgets.properties.pinned}
+                pinned={selectors.widgets.properties.pinned}
                 onToggleCollapsed={() => toggleWidgetCollapsedFromWorkspace('properties')}
                 onTogglePinned={() => toggleWidgetPinnedFromWorkspace('properties')}
                 onHide={() => setWidgetVisibilityFromWorkspace('properties', false)}
@@ -295,52 +166,52 @@ export function CadWorkspacePage() {
             </div>
           </aside>
         ) : null}
-        {showPropertiesWidget ? <div className="workspace-resize-handle vertical" onPointerDown={beginResize('left')} /> : null}
+        {selectors.showPropertiesWidget ? <div className="workspace-resize-handle vertical" onPointerDown={beginResize('left')} /> : null}
 
         <section className="workspace-center">
           <WorkspaceToolrail
-            activeTool={activeTool}
-            cameraView={cameraView}
+            activeTool={selectors.activeTool}
+            cameraView={selectors.cameraView}
             canSnapSelection={canSnapSelection}
             dispatch={dispatchFromWorkspace}
-            projectionMode={projectionMode}
-            showDimensions={showDimensions}
+            projectionMode={selectors.projectionMode}
+            showDimensions={selectors.showDimensions}
           />
           <WorkspaceViewportShell
-            activeTool={activeTool}
-            cameraQuaternion={viewportCameraQuaternion}
-            cameraView={cameraView}
-            detectionCount={detectionCount}
+            activeTool={selectors.activeTool}
+            cameraQuaternion={selectors.viewportCameraQuaternion}
+            cameraView={selectors.cameraView}
+            detectionCount={selectors.detectionCount}
             dispatch={dispatchFromWorkspace}
-            monitoringCameraCount={monitoringCameraCount}
-            projectionMode={projectionMode}
-            sceneId={sceneId}
-            scenePlacementsCount={scenePlacementsCount}
+            monitoringCameraCount={selectors.monitoringCameraCount}
+            projectionMode={selectors.projectionMode}
+            sceneId={selectors.sceneId}
+            scenePlacementsCount={selectors.scenePlacementsCount}
           />
         </section>
 
-        {rightPanelOpen && anyRightWidgetVisible ? <div className="workspace-resize-handle vertical" onPointerDown={beginResize('right')} /> : null}
-        {rightPanelOpen && anyRightWidgetVisible ? (
+        {selectors.rightPanelOpen && anyRightWidgetVisible ? <div className="workspace-resize-handle vertical" onPointerDown={beginResize('right')} /> : null}
+        {selectors.rightPanelOpen && anyRightWidgetVisible ? (
           <aside className="workspace-side workspace-side-right" style={{ width: `${rightPanelWidthPx}px` }}>
             <div className="workspace-side-head workspace-side-head-wrap">
               <button
                 type="button"
-                className={showOutlinerWidget ? 'active' : ''}
-                onClick={() => setWidgetVisibilityFromWorkspace('outliner', !widgets.outliner.visible)}
+                className={selectors.showOutlinerWidget ? 'active' : ''}
+                onClick={() => setWidgetVisibilityFromWorkspace('outliner', !selectors.widgets.outliner.visible)}
               >
                 Outliner
               </button>
               <button
                 type="button"
-                className={showCameraWidget ? 'active' : ''}
-                onClick={() => setWidgetVisibilityFromWorkspace('camera', !widgets.camera.visible)}
+                className={selectors.showCameraWidget ? 'active' : ''}
+                onClick={() => setWidgetVisibilityFromWorkspace('camera', !selectors.widgets.camera.visible)}
               >
                 Camera
               </button>
               <button
                 type="button"
-                className={showPlanWidget ? 'active' : ''}
-                onClick={() => setWidgetVisibilityFromWorkspace('planogram', !widgets.planogram.visible)}
+                className={selectors.showPlanWidget ? 'active' : ''}
+                onClick={() => setWidgetVisibilityFromWorkspace('planogram', !selectors.widgets.planogram.visible)}
               >
                 Planogram
               </button>
@@ -349,16 +220,16 @@ export function CadWorkspacePage() {
               </button>
             </div>
             <div className="workspace-side-content workspace-side-content-split">
-              {showOutlinerWidget ? (
+              {selectors.showOutlinerWidget ? (
                 <div
-                  className={`workspace-right-panel-top ${showCameraWidget || showPlanWidget ? '' : 'fill'}`}
-                  style={showCameraWidget || showPlanWidget ? { height: `${outlinerHeightPx}px` } : undefined}
+                  className={`workspace-right-panel-top ${selectors.showCameraWidget || selectors.showPlanWidget ? '' : 'fill'}`}
+                  style={selectors.showCameraWidget || selectors.showPlanWidget ? { height: `${outlinerHeightPx}px` } : undefined}
                 >
                   <WorkspaceWidgetCard
-                    collapsed={widgets.outliner.collapsed}
+                    collapsed={selectors.widgets.outliner.collapsed}
                     icon={<IconOutliner className="workspace-widget-head-icon" />}
                     label="Scene Outliner"
-                    pinned={widgets.outliner.pinned}
+                    pinned={selectors.widgets.outliner.pinned}
                     onToggleCollapsed={() => toggleWidgetCollapsedFromWorkspace('outliner')}
                     onTogglePinned={() => toggleWidgetPinnedFromWorkspace('outliner')}
                     onHide={() => setWidgetVisibilityFromWorkspace('outliner', false)}
@@ -367,17 +238,17 @@ export function CadWorkspacePage() {
                   </WorkspaceWidgetCard>
                 </div>
               ) : null}
-              {showOutlinerWidget && (showCameraWidget || showPlanWidget) && !widgets.outliner.collapsed ? (
+              {selectors.showOutlinerWidget && (selectors.showCameraWidget || selectors.showPlanWidget) && !selectors.widgets.outliner.collapsed ? (
                 <div className="workspace-resize-handle horizontal inset" onPointerDown={beginResize('right_outliner')} />
               ) : null}
-              {showCameraWidget || showPlanWidget ? (
+              {selectors.showCameraWidget || selectors.showPlanWidget ? (
                 <div className="workspace-right-panel-bottom workspace-widget-stack">
-                  {showCameraWidget ? (
+                  {selectors.showCameraWidget ? (
                     <WorkspaceWidgetCard
-                      collapsed={widgets.camera.collapsed}
+                      collapsed={selectors.widgets.camera.collapsed}
                       icon={<IconCamera className="workspace-widget-head-icon" />}
                       label="Camera Map"
-                      pinned={widgets.camera.pinned}
+                      pinned={selectors.widgets.camera.pinned}
                       onToggleCollapsed={() => toggleWidgetCollapsedFromWorkspace('camera')}
                       onTogglePinned={() => toggleWidgetPinnedFromWorkspace('camera')}
                       onHide={() => setWidgetVisibilityFromWorkspace('camera', false)}
@@ -387,12 +258,12 @@ export function CadWorkspacePage() {
                       </Suspense>
                     </WorkspaceWidgetCard>
                   ) : null}
-                  {showPlanWidget ? (
+                  {selectors.showPlanWidget ? (
                     <WorkspaceWidgetCard
-                      collapsed={widgets.planogram.collapsed}
+                      collapsed={selectors.widgets.planogram.collapsed}
                       icon={<IconPlanogram className="workspace-widget-head-icon" />}
                       label="Planogram"
-                      pinned={widgets.planogram.pinned}
+                      pinned={selectors.widgets.planogram.pinned}
                       onToggleCollapsed={() => toggleWidgetCollapsedFromWorkspace('planogram')}
                       onTogglePinned={() => toggleWidgetPinnedFromWorkspace('planogram')}
                       onHide={() => setWidgetVisibilityFromWorkspace('planogram', false)}
@@ -410,24 +281,24 @@ export function CadWorkspacePage() {
       </main>
 
       <WorkspaceStatusBar
-        activeToolMode={activeTool}
-        bridgeUrl={bridgeUrl}
-        cameraView={cameraView}
-        projectionMode={projectionMode}
-        detectionCount={detectionCount}
-        monitoringCameraCount={monitoringCameraCount}
-        placementCount={scenePlacementsCount}
-        sceneEditEnabled={sceneEditEnabled}
-        sceneEventTerminalOpen={sceneEventTerminalOpen}
-        sceneId={sceneId}
-        sceneRemoteHoldEnabled={sceneRemoteHoldEnabled}
-        sceneRevision={sceneRevision}
-        sceneSequence={sceneSequence}
+        activeToolMode={selectors.activeTool}
+        bridgeUrl={selectors.bridgeUrl}
+        cameraView={selectors.cameraView}
+        projectionMode={selectors.projectionMode}
+        detectionCount={selectors.detectionCount}
+        monitoringCameraCount={selectors.monitoringCameraCount}
+        placementCount={selectors.scenePlacementsCount}
+        sceneEditEnabled={selectors.sceneEditEnabled}
+        sceneEventTerminalOpen={selectors.sceneEventTerminalOpen}
+        sceneId={selectors.sceneId}
+        sceneRemoteHoldEnabled={selectors.sceneRemoteHoldEnabled}
+        sceneRevision={selectors.sceneRevision}
+        sceneSequence={selectors.sceneSequence}
       />
 
-      <div className="workspace-terminal-strip" style={{ height: sceneEventTerminalOpen ? `${terminalHeightPx + 8}px` : '34px' }}>
-        {sceneEventTerminalOpen ? <div className="workspace-resize-handle horizontal" onPointerDown={beginResize('terminal')} /> : null}
-        {sceneEventTerminalOpen ? (
+      <div className="workspace-terminal-strip" style={{ height: selectors.sceneEventTerminalOpen ? `${selectors.terminalHeightPx + 8}px` : '34px' }}>
+        {selectors.sceneEventTerminalOpen ? <div className="workspace-resize-handle horizontal" onPointerDown={beginResize('terminal')} /> : null}
+        {selectors.sceneEventTerminalOpen ? (
           <Suspense fallback={<div className="terminal-shell-loading">Loading terminal...</div>}>
             <SceneEventTerminal layout="docked" />
           </Suspense>
@@ -438,7 +309,7 @@ export function CadWorkspacePage() {
             onClick={() => dispatchFromWorkspace({ kind: 'toggle_scene_event_terminal' })}
           >
             <span>Event Terminal</span>
-            <span>events:{sceneEventLogCount}</span>
+            <span>events:{selectors.sceneEventLogCount}</span>
             <span>{STUDIO_SHORTCUTS.terminal.toggle}</span>
           </button>
         )}
