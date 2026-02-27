@@ -1,2 +1,5 @@
 export * from './useWorkspaceSelectors'
 export * from './useResizePanels'
+export * from './useOutlinerSceneData'
+export * from './useOutlinerFiltering'
+export * from './useOutlinerSelection'
