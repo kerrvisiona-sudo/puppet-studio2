@@ -8,6 +8,7 @@ import {
 import { reflectAppCommandToTerminalLine } from './commandReflection'
 import { commandRegistry } from './commandRegistry'
 import { undoManager } from './undoManager'
+import { transactionManager } from './transactionManager'
 import { useSceneStore, useViewportStore, useBridgeStore, useAvatarStore, useUiStore, useWorkspaceStore } from '../../app/state'
 import { sceneService, bridgeService } from '../../services'
 import { createEngineRuntime, type EngineCapability } from '../engine'
@@ -246,7 +247,17 @@ const poseStoreEngineRuntime = createEngineRuntime<AppCommand, PoseStoreEngineCa
   dispatchCommand: (envelope) => {
     const undoResult = dispatchAppCommandEnvelope(getPoseStoreCommandPort(), envelope)
     const meta = commandRegistry.get(envelope.command.kind)
-    if (meta?.flags?.undoable && undoResult) {
+
+    // Transaction integration: buffer commands during active transaction
+    if (transactionManager.isActive()) {
+      const reflectedLine = reflectAppCommandToTerminalLine(envelope.command)
+      transactionManager.recordCommand(
+        envelope,
+        meta?.flags?.undoable ? undoResult ?? null : null,
+        reflectedLine,
+      )
+    } else if (meta?.flags?.undoable && undoResult) {
+      // Original behavior: push directly to undo stack
       undoManager.push({
         envelope,
         undoResult,
@@ -408,22 +419,26 @@ export function dispatchAppCommandRuntime(
     source: 'frontend.command_bus',
     summary: `cmd ${command.kind} from ${envelope.source}`,
   })
-  const reflectedCommand = reflectAppCommandToTerminalLine(command)
-  if (reflectedCommand && !source.startsWith('ui.event_terminal')) {
-    uiStore.appendSceneEvent({
-      kind: 'command_line_reflection',
-      level: 'info',
-      message: {
-        command,
-        line: reflectedCommand,
-        source,
-      },
-      revision: sceneStore.sceneRevision,
-      sceneId: sceneStore.sceneId,
-      sequence: sceneStore.sceneSequence,
-      source: 'frontend.command_line',
-      summary: `ui> ${reflectedCommand}`,
-    })
+  // Suppress individual command reflection during transactions
+  // (transaction summary will be shown instead)
+  if (!transactionManager.isActive()) {
+    const reflectedCommand = reflectAppCommandToTerminalLine(command)
+    if (reflectedCommand && !source.startsWith('ui.event_terminal')) {
+      uiStore.appendSceneEvent({
+        kind: 'command_line_reflection',
+        level: 'info',
+        message: {
+          command,
+          line: reflectedCommand,
+          source,
+        },
+        revision: sceneStore.sceneRevision,
+        sceneId: sceneStore.sceneId,
+        sequence: sceneStore.sceneSequence,
+        source: 'frontend.command_line',
+        summary: `ui> ${reflectedCommand}`,
+      })
+    }
   }
   poseStoreEngineRuntime.dispatchEnvelope(envelope)
   return envelope
