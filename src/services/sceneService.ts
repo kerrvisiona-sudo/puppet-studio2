@@ -5,7 +5,7 @@ import { sendBridgePayload } from '../core/bridge-runtime/bridgeOutbound'
 import { buildScenePatchFromPlacements } from '../core/scene-domain/scenePatch'
 import { runtimeConfig } from '../core/config/runtimeConfig'
 import type { SceneCommand } from '../core/scene-domain/sceneCommands'
-import type { SceneEngineCommandMeta, SceneEngineEffect, SceneEngineDomainEvent } from '../core/scene-domain/sceneEngine'
+import type { SceneEngineCommandMeta, SceneEngineEffect, SceneEngineDomainEvent, SceneEngineResult, SceneEngineState } from '../core/scene-domain/sceneEngine'
 
 /**
  * Scene Service
@@ -17,10 +17,10 @@ export const sceneService = {
   /**
    * Ejecuta un comando de scene y opcionalmente lo publica al bridge
    */
-  runCommand(command: SceneCommand, commandMeta?: SceneEngineCommandMeta) {
+  runCommand(command: SceneCommand, commandMeta?: SceneEngineCommandMeta): SceneEngineResult<SceneEngineState> | undefined {
     const sceneStore = useSceneStore.getState()
 
-    sceneStore.dispatchCommand(
+    return sceneStore.dispatchCommand(
       { kind: 'run_scene_command', meta: commandMeta, payload: command },
       (effect) => this.handleSceneEffect(effect),
       (events) => this.handleSceneEvents(events),
@@ -35,32 +35,6 @@ export const sceneService = {
 
     sceneStore.dispatchCommand(
       { kind: 'clear_scene', meta: commandMeta },
-      (effect) => this.handleSceneEffect(effect),
-      (events) => this.handleSceneEvents(events),
-    )
-  },
-
-  /**
-   * Undo último cambio
-   */
-  undo(commandMeta?: SceneEngineCommandMeta) {
-    const sceneStore = useSceneStore.getState()
-
-    sceneStore.dispatchCommand(
-      { kind: 'undo', meta: commandMeta },
-      (effect) => this.handleSceneEffect(effect),
-      (events) => this.handleSceneEvents(events),
-    )
-  },
-
-  /**
-   * Redo último cambio deshecho
-   */
-  redo(commandMeta?: SceneEngineCommandMeta) {
-    const sceneStore = useSceneStore.getState()
-
-    sceneStore.dispatchCommand(
-      { kind: 'redo', meta: commandMeta },
       (effect) => this.handleSceneEffect(effect),
       (events) => this.handleSceneEvents(events),
     )

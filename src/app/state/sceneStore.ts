@@ -8,9 +8,11 @@ import {
   type SceneEngineCommandMeta,
   type SceneEngineDomainEvent,
   type SceneEngineEffect,
-  type SceneHistoryEntry,
+  type SceneEngineResult,
+  type SceneEngineState,
 } from '../../core/scene-domain/sceneEngine'
 import { runtimeConfig } from '../../core/config/runtimeConfig'
+import { undoManager } from '../../core/app-commanding/undoManager'
 
 export type SceneSource = 'default' | 'scene' | 'local_edit'
 
@@ -37,9 +39,7 @@ export type SceneState = {
   // Selection
   selectedPlacementId: string | null
 
-  // Undo/Redo
-  sceneUndoStack: SceneHistoryEntry[]
-  sceneRedoStack: SceneHistoryEntry[]
+  // Undo/Redo (computed from undoManager)
   sceneUndoDepth: number
   sceneRedoDepth: number
 
@@ -56,11 +56,14 @@ export type SceneState = {
     command: SceneEngineCommand,
     onEffect?: (effect: SceneEngineEffect) => void,
     onEvents?: (events: SceneEngineDomainEvent[]) => void,
-  ) => void
+  ) => SceneEngineResult<SceneEngineState> | undefined
   runSceneCommand: (command: SceneCommand, commandMeta?: SceneEngineCommandMeta) => void
   clearScene: (commandMeta?: SceneEngineCommandMeta) => void
-  undoSceneEdit: (commandMeta?: SceneEngineCommandMeta) => void
-  redoSceneEdit: (commandMeta?: SceneEngineCommandMeta) => void
+  restoreState: (partialState: {
+    scenePlacements?: Placement[]
+    selectedPlacementId?: string | null
+  }) => void
+  getUndoRedoDepth: () => { undoDepth: number; redoDepth: number }
   nudgeSelectedPlacement: (deltaXM: number, deltaZM: number) => void
   rotateSelectedPlacement: (deltaDeg: number) => void
   snapSelectedPlacementToGrid: (stepM: number) => void
@@ -119,8 +122,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   sceneRemoteOverrideAt: null,
   sceneRemoteOverrideKind: null,
   selectedPlacementId: null,
-  sceneUndoStack: [],
-  sceneRedoStack: [],
   sceneUndoDepth: 0,
   sceneRedoDepth: 0,
   sceneSpecialistGeneratedAt: null,
@@ -131,9 +132,15 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   sceneSpatialStalePolicy: null,
 
   // Actions
+  getUndoRedoDepth: () => {
+    const state = undoManager.state
+    return { undoDepth: state.undoCount, redoDepth: state.redoCount }
+  },
+
   dispatchCommand: (command, onEffect, onEvents) => {
     let effect: SceneEngineEffect | null = null
     let events: SceneEngineDomainEvent[] = []
+    let engineResult: SceneEngineResult<SceneEngineState> | undefined
 
     set((state) => {
       const result = dispatchSceneEngineCommand(
@@ -141,10 +148,10 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         command,
         {
           constraints: runtimeConfig.sceneConstraintZones,
-          undoLimit: runtimeConfig.sceneUndoLimit,
         },
       )
 
+      engineResult = result
       effect = result.effect
       events = result.events
 
@@ -153,6 +160,8 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
     if (effect && onEffect) onEffect(effect)
     if (events.length > 0 && onEvents) onEvents(events)
+
+    return engineResult
   },
 
   runSceneCommand: (command, commandMeta) => {
@@ -165,14 +174,14 @@ export const useSceneStore = create<SceneState>((set, get) => ({
     dispatchCommand({ kind: 'clear_scene', meta: commandMeta })
   },
 
-  undoSceneEdit: (commandMeta) => {
-    const { dispatchCommand } = get()
-    dispatchCommand({ kind: 'undo', meta: commandMeta })
-  },
-
-  redoSceneEdit: (commandMeta) => {
-    const { dispatchCommand } = get()
-    dispatchCommand({ kind: 'redo', meta: commandMeta })
+  restoreState: (partialState) => {
+    set((state) => ({
+      ...state,
+      ...partialState,
+      sceneRevision: (state.sceneRevision ?? 0) + 1,
+      sceneLastEventAt: new Date().toISOString(),
+      sceneSource: 'local_edit',
+    }))
   },
 
   nudgeSelectedPlacement: (deltaXM, deltaZM) => {
@@ -216,10 +225,6 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       sceneSpatialStaleAfterS: update.specialistMeta?.spatialStaleAfterS ?? state.sceneSpatialStaleAfterS,
       sceneSpatialStalePolicy: update.specialistMeta?.stalePolicy ?? state.sceneSpatialStalePolicy,
       sceneError: null,
-      sceneUndoStack: [],
-      sceneRedoStack: [],
-      sceneUndoDepth: 0,
-      sceneRedoDepth: 0,
       selectedPlacementId: state.selectedPlacementId && update.placements?.some((p) => p.id === state.selectedPlacementId) ? state.selectedPlacementId : null,
     })),
 }))

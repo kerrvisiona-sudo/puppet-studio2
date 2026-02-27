@@ -12,26 +12,17 @@ export type SceneEngineCommandMeta = {
   source: string
 }
 
-export type SceneHistoryEntry = {
-  placements: Placement[]
-  selectedPlacementId: string | null
-}
-
 export type SceneEngineState = {
   sceneEditEnabled: boolean
   sceneError: string | null
   sceneId: string
   sceneLastEventAt: string | null
   scenePlacements: Placement[]
-  sceneRedoDepth: number
-  sceneRedoStack: SceneHistoryEntry[]
   sceneRemoteOverrideAt: string | null
   sceneRemoteOverrideKind: SceneEngineRemoteOverrideKind | null
   sceneRevision: number | null
   sceneRoom: RoomDefinition
   sceneSource: SceneEngineSource
-  sceneUndoDepth: number
-  sceneUndoStack: SceneHistoryEntry[]
   selectedPlacementId: string | null
 }
 
@@ -41,17 +32,9 @@ export type SceneEngineCommand =
       meta?: SceneEngineCommandMeta
     }
   | {
-      kind: 'redo'
-      meta?: SceneEngineCommandMeta
-    }
-  | {
       kind: 'run_scene_command'
       meta?: SceneEngineCommandMeta
       payload: SceneCommand
-    }
-  | {
-      kind: 'undo'
-      meta?: SceneEngineCommandMeta
     }
 
 export type SceneEngineDomainEvent =
@@ -80,7 +63,6 @@ export type SceneEngineEffect = {
 export type SceneEngineDependencies = {
   constraints?: SceneConstraintZone[]
   nowIso?: () => string
-  undoLimit: number
 }
 
 export type SceneEngineResult<S extends SceneEngineState> = {
@@ -88,20 +70,16 @@ export type SceneEngineResult<S extends SceneEngineState> = {
   effect: SceneEngineEffect | null
   events: SceneEngineDomainEvent[]
   nextState: S
-}
-
-function cloneHistoryEntry(entry: SceneHistoryEntry): SceneHistoryEntry {
-  return {
-    placements: clonePlacements(entry.placements),
-    selectedPlacementId: entry.selectedPlacementId,
+  undoResult?: {
+    previousState: {
+      scenePlacements: Placement[]
+      selectedPlacementId: string | null
+    }
+    nextState: {
+      scenePlacements: Placement[]
+      selectedPlacementId: string | null
+    }
   }
-}
-
-function pushUndoEntry(stack: SceneHistoryEntry[], entry: SceneHistoryEntry, undoLimit: number): SceneHistoryEntry[] {
-  const next = [...stack, cloneHistoryEntry(entry)]
-  const limit = Math.max(1, undoLimit)
-  if (next.length <= limit) return next
-  return next.slice(next.length - limit)
 }
 
 function withPatch<S extends SceneEngineState>(state: S, patch: Partial<SceneEngineState>): S {
@@ -179,27 +157,14 @@ export function dispatchSceneEngineCommand<S extends SceneEngineState>(
       }
     }
 
-    const nextUndoStack = pushUndoEntry(
-      state.sceneUndoStack,
-      {
-        placements: state.scenePlacements,
-        selectedPlacementId: state.selectedPlacementId,
-      },
-      dependencies.undoLimit,
-    )
-
     const nextState = withPatch(state, {
       sceneError: null,
       sceneLastEventAt: nowIso(),
       scenePlacements: result.placements,
-      sceneRedoDepth: 0,
-      sceneRedoStack: [],
       sceneRemoteOverrideAt: null,
       sceneRemoteOverrideKind: null,
       sceneRevision: (state.sceneRevision ?? 0) + 1,
       sceneSource: 'local_edit',
-      sceneUndoDepth: nextUndoStack.length,
-      sceneUndoStack: nextUndoStack,
       selectedPlacementId: result.selectedPlacementId,
     })
 
@@ -214,6 +179,16 @@ export function dispatchSceneEngineCommand<S extends SceneEngineState>(
       },
       events: [{ command: command.kind, kind: 'scene_engine_changed' }],
       nextState,
+      undoResult: {
+        previousState: {
+          scenePlacements: state.scenePlacements,
+          selectedPlacementId: state.selectedPlacementId,
+        },
+        nextState: {
+          scenePlacements: result.placements,
+          selectedPlacementId: result.selectedPlacementId,
+        },
+      },
     }
   }
 
@@ -228,27 +203,14 @@ export function dispatchSceneEngineCommand<S extends SceneEngineState>(
       }
     }
 
-    const nextUndoStack = pushUndoEntry(
-      state.sceneUndoStack,
-      {
-        placements: state.scenePlacements,
-        selectedPlacementId: state.selectedPlacementId,
-      },
-      dependencies.undoLimit,
-    )
-
     const nextState = withPatch(state, {
       sceneError: null,
       sceneLastEventAt: nowIso(),
       scenePlacements: [],
-      sceneRedoDepth: 0,
-      sceneRedoStack: [],
       sceneRemoteOverrideAt: null,
       sceneRemoteOverrideKind: null,
       sceneRevision: (state.sceneRevision ?? 0) + 1,
       sceneSource: 'local_edit',
-      sceneUndoDepth: nextUndoStack.length,
-      sceneUndoStack: nextUndoStack,
       selectedPlacementId: null,
     })
 
@@ -263,106 +225,23 @@ export function dispatchSceneEngineCommand<S extends SceneEngineState>(
       },
       events: [{ command: command.kind, kind: 'scene_engine_changed' }],
       nextState,
-    }
-  }
-
-  if (command.kind === 'undo') {
-    if (!state.sceneEditEnabled) return rejectEditDisabled(state, command.kind)
-    if (state.sceneUndoStack.length === 0) {
-      return {
-        changed: false,
-        effect: null,
-        events: [{ command: command.kind, kind: 'scene_engine_noop' }],
-        nextState: state,
-      }
-    }
-
-    const previous = state.sceneUndoStack[state.sceneUndoStack.length - 1]
-    const nextUndoStack = state.sceneUndoStack.slice(0, -1)
-    const nextRedoStack = pushUndoEntry(
-      state.sceneRedoStack,
-      {
-        placements: state.scenePlacements,
-        selectedPlacementId: state.selectedPlacementId,
+      undoResult: {
+        previousState: {
+          scenePlacements: state.scenePlacements,
+          selectedPlacementId: state.selectedPlacementId,
+        },
+        nextState: {
+          scenePlacements: [],
+          selectedPlacementId: null,
+        },
       },
-      dependencies.undoLimit,
-    )
-
-    const nextState = withPatch(state, {
-      sceneError: null,
-      sceneLastEventAt: nowIso(),
-      scenePlacements: clonePlacements(previous.placements),
-      sceneRedoDepth: nextRedoStack.length,
-      sceneRedoStack: nextRedoStack,
-      sceneRemoteOverrideAt: null,
-      sceneRemoteOverrideKind: null,
-      sceneRevision: (state.sceneRevision ?? 0) + 1,
-      sceneSource: 'local_edit',
-      sceneUndoDepth: nextUndoStack.length,
-      sceneUndoStack: nextUndoStack,
-      selectedPlacementId: previous.selectedPlacementId,
-    })
-
-    return {
-      changed: true,
-      effect: {
-        commandMeta: command.meta ?? null,
-        kind: 'publish_scene_patch',
-        nextPlacements: previous.placements,
-        previousPlacements: state.scenePlacements,
-        sceneId: state.sceneId,
-      },
-      events: [{ command: command.kind, kind: 'scene_engine_changed' }],
-      nextState,
     }
   }
-
-  if (!state.sceneEditEnabled) return rejectEditDisabled(state, command.kind)
-  if (state.sceneRedoStack.length === 0) {
-    return {
-      changed: false,
-      effect: null,
-      events: [{ command: command.kind, kind: 'scene_engine_noop' }],
-      nextState: state,
-    }
-  }
-
-  const nextEntry = state.sceneRedoStack[state.sceneRedoStack.length - 1]
-  const nextRedoStack = state.sceneRedoStack.slice(0, -1)
-  const nextUndoStack = pushUndoEntry(
-    state.sceneUndoStack,
-    {
-      placements: state.scenePlacements,
-      selectedPlacementId: state.selectedPlacementId,
-    },
-    dependencies.undoLimit,
-  )
-
-  const nextState = withPatch(state, {
-    sceneError: null,
-    sceneLastEventAt: nowIso(),
-    scenePlacements: clonePlacements(nextEntry.placements),
-    sceneRedoDepth: nextRedoStack.length,
-    sceneRedoStack: nextRedoStack,
-    sceneRemoteOverrideAt: null,
-    sceneRemoteOverrideKind: null,
-    sceneRevision: (state.sceneRevision ?? 0) + 1,
-    sceneSource: 'local_edit',
-    sceneUndoDepth: nextUndoStack.length,
-    sceneUndoStack: nextUndoStack,
-    selectedPlacementId: nextEntry.selectedPlacementId,
-  })
 
   return {
-    changed: true,
-    effect: {
-      commandMeta: command.meta ?? null,
-      kind: 'publish_scene_patch',
-      nextPlacements: nextEntry.placements,
-      previousPlacements: state.scenePlacements,
-      sceneId: state.sceneId,
-    },
-    events: [{ command: command.kind, kind: 'scene_engine_changed' }],
-    nextState,
+    changed: false,
+    effect: null,
+    events: [{ command: 'run_scene_command', kind: 'scene_engine_noop' }],
+    nextState: state,
   }
 }

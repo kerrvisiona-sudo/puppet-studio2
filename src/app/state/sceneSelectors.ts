@@ -1,4 +1,5 @@
 import type { SceneState } from './sceneStore'
+import { undoManager } from '../../core/app-commanding/undoManager'
 
 /**
  * Selector factories for sceneStore
@@ -24,11 +25,14 @@ export const sceneSelectors = {
   }),
 
   /** Undo/redo state (3 props) */
-  sceneHistory: (s: SceneState) => ({
-    sceneEditEnabled: s.sceneEditEnabled,
-    sceneUndoDepth: s.sceneUndoDepth,
-    sceneRedoDepth: s.sceneRedoDepth,
-  }),
+  sceneHistory: (s: SceneState) => {
+    const historyState = s.getUndoRedoDepth()
+    return {
+      sceneEditEnabled: s.sceneEditEnabled,
+      sceneUndoDepth: historyState.undoDepth,
+      sceneRedoDepth: historyState.redoDepth,
+    }
+  },
 
   /** Monitoring cameras (1 prop) */
   monitoringCameras: (s: SceneState) => s.monitoringCameras,

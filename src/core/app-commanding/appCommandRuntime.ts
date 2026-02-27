@@ -113,10 +113,13 @@ function getPoseStoreCommandPort(): AppCommandPort {
       }
     },
     runSceneCommand: (command, envelope) => {
-      sceneService.runCommand(command, toSceneEngineMeta(envelope))
+      const result = sceneService.runCommand(command, toSceneEngineMeta(envelope))
+      if (!result?.undoResult) return undefined
+
+      const sceneStore = useSceneStore.getState()
       return {
-        redo: () => sceneService.redo(toSceneEngineMeta(envelope)),
-        undo: () => sceneService.undo(toSceneEngineMeta(envelope)),
+        undo: () => sceneStore.restoreState(result.undoResult!.previousState),
+        redo: () => sceneStore.restoreState(result.undoResult!.nextState),
       }
     },
     setBridgeEnabled: (enabled) => bridgeStore.setBridgeEnabled(enabled),

@@ -1,5 +1,6 @@
 import { atom } from 'jotai'
 import { sceneAtom, viewportAtom, avatarAtom } from './storeAtoms'
+import { undoManager } from '../../core/app-commanding/undoManager'
 
 /**
  * Derived atoms for scene geometry and state
@@ -25,12 +26,13 @@ export const selectedPlacementAtom = atom((get) => {
 /** Scene undo/redo availability */
 export const sceneHistoryAvailabilityAtom = atom((get) => {
   const scene = get(sceneAtom)
+  const historyState = scene.getUndoRedoDepth()
 
   return {
-    canUndo: scene.sceneEditEnabled && scene.sceneUndoDepth > 0,
-    canRedo: scene.sceneEditEnabled && scene.sceneRedoDepth > 0,
-    undoDepth: scene.sceneUndoDepth,
-    redoDepth: scene.sceneRedoDepth,
+    canUndo: scene.sceneEditEnabled && historyState.undoDepth > 0,
+    canRedo: scene.sceneEditEnabled && historyState.redoDepth > 0,
+    undoDepth: historyState.undoDepth,
+    redoDepth: historyState.redoDepth,
   }
 })
 
