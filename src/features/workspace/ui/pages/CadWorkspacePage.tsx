@@ -444,7 +444,7 @@ export function CadWorkspacePage() {
         )}
       </div>
 
-      <WorkspaceCommandPalette actions={quickActions} />
+      <WorkspaceCommandPalette actions={quickActions} dispatch={dispatchFromWorkspace} />
     </div>
   )
 }

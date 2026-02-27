@@ -18,10 +18,12 @@
     "@react-three/cannon": "latest",
     "@react-three/drei": "latest",
     "@react-three/fiber": "latest",
+    "jotai": "^2.18.0",
     "react": "latest",
     "react-dom": "latest",
     "three": "latest",
     "ws": "latest",
+    "zod": "^4.3.6",
     "zustand": "latest"
   },
   "devDependencies": {

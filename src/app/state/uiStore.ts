@@ -20,12 +20,16 @@ export type UiState = {
   sceneEventLogPaused: boolean
   sceneEventTerminalOpen: boolean
 
+  // Command Palette
+  commandPaletteOpen: boolean
+
   // Actions
   setActiveToolMode: (mode: ToolMode) => void
   setSceneEventAutoScroll: (enabled: boolean) => void
   setSceneEventLogPaused: (enabled: boolean) => void
   setSceneEventTerminalOpen: (enabled: boolean) => void
   toggleSceneEventTerminal: () => void
+  toggleCommandPalette: () => void
   appendSceneEvent: (event: SceneEventInput) => void
   clearSceneEventLog: () => void
 }
@@ -38,6 +42,7 @@ export const useUiStore = create<UiState>((set) => ({
   sceneEventLog: [],
   sceneEventLogPaused: false,
   sceneEventTerminalOpen: runtimeConfig.defaultSceneEventTerminalOpen,
+  commandPaletteOpen: false,
 
   // Actions
   setActiveToolMode: (mode) => set({ activeToolMode: mode }),
@@ -45,6 +50,7 @@ export const useUiStore = create<UiState>((set) => ({
   setSceneEventLogPaused: (enabled) => set({ sceneEventLogPaused: enabled }),
   setSceneEventTerminalOpen: (enabled) => set({ sceneEventTerminalOpen: enabled }),
   toggleSceneEventTerminal: () => set((state) => ({ sceneEventTerminalOpen: !state.sceneEventTerminalOpen })),
+  toggleCommandPalette: () => set((state) => ({ commandPaletteOpen: !state.commandPaletteOpen })),
 
   appendSceneEvent: (event) =>
     set((state) => {

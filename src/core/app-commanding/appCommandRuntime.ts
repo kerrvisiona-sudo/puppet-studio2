@@ -389,3 +389,5 @@ export function dispatchAppCommandRuntime(
   poseStoreEngineRuntime.dispatchEnvelope(envelope)
   return envelope
 }
+
+export const dispatchPoseStoreCommand = dispatchAppCommandRuntime

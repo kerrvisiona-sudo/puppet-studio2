@@ -5,6 +5,9 @@ import { isPrimaryShortcut, STUDIO_SHORTCUTS } from '../../../../shared/shortcut
 
 export const WORKSPACE_COMMAND_PALETTE_EVENT = 'simula.workspace.command_palette'
 
+import { commandRegistry } from '../../../../core/app-commanding/commandRegistry'
+import type { AppCommand } from '../../../../core/app-commanding/appCommandBus'
+
 export type WorkspaceQuickAction = {
   execute: () => void
   group?: string
@@ -16,6 +19,7 @@ export type WorkspaceQuickAction = {
 
 type WorkspaceCommandPaletteProps = {
   actions: WorkspaceQuickAction[]
+  dispatch: (command: AppCommand) => void
 }
 
 function matchesQuery(action: WorkspaceQuickAction, query: string): boolean {
@@ -34,15 +38,69 @@ function isTextInputTarget(target: EventTarget | null): boolean {
   return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || target.isContentEditable
 }
 
-export function WorkspaceCommandPalette({ actions }: WorkspaceCommandPaletteProps) {
+export function WorkspaceCommandPalette({ actions, dispatch }: WorkspaceCommandPaletteProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
+  const mergedActions = useMemo(() => {
+    const list = [...actions]
+    const existingIds = new Set(list.map((a) => a.id))
+    const existingGroups = new Set(list.map((a) => a.group))
+
+    // Fallback UI categories if none explicitly provided by standard quick actions
+    const groupMap: Record<string, string> = {
+      scene: 'Scene',
+      viewport: 'View',
+      ui: 'Layout',
+      workspace: 'Layout',
+      bridge: 'Bridge',
+      engine: 'Engine',
+    }
+
+    for (const meta of commandRegistry.list()) {
+      // Skip commands already represented by highly-tailored quick actions
+      // (like set_camera_view which is expanded into view_iso, view_top, etc)
+      if (
+        meta.id === 'set_camera_view' ||
+        meta.id === 'set_projection_mode' ||
+        meta.id === 'set_active_tool' ||
+        meta.id === 'apply_workspace_layout_preset' ||
+        meta.id === 'run_scene_command' ||
+        meta.id === 'set_scene_id' ||
+        meta.id === 'set_selected_placement'
+      ) {
+        continue
+      }
+
+      // If the command is not explicitly hand-coded in QuickActions, auto-inject it
+      if (!existingIds.has(meta.id)) {
+        list.push({
+          id: meta.id,
+          group: groupMap[meta.category] ?? 'Other',
+          label: meta.label,
+          keywords: meta.description,
+          execute: () => {
+            if (meta.fromTerminalArgs) {
+              const res = meta.fromTerminalArgs([], {} as any)
+              if (res.commands.length > 0) {
+                dispatch(res.commands[0])
+              }
+            } else {
+              // Direct parameterless dispatch for simple commands like undo/redo/clear
+              dispatch({ kind: meta.id } as any)
+            }
+          },
+        })
+      }
+    }
+    return list
+  }, [actions])
+
   const filteredActions = useMemo(
-    () => actions.filter((action) => matchesQuery(action, query)),
-    [actions, query],
+    () => mergedActions.filter((action) => matchesQuery(action, query)),
+    [mergedActions, query],
   )
 
   const groupedActions = useMemo(() => {
