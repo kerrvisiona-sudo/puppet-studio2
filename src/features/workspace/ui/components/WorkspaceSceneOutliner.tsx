@@ -1,8 +1,6 @@
-import { useMemo, useState } from 'react'
 import type { ReactNode, SVGProps } from 'react'
 
-import { useSceneStore, useViewportStore, useUiStore } from '../../../../app/state'
-import { selectSelectedPlacementView } from '../../../../core/scene-domain'
+import { useOutlinerSceneData, useOutlinerFiltering, useOutlinerSelection } from '../../hooks'
 import {
   createAppCommandDispatcher,
   IconCamera,
@@ -57,137 +55,62 @@ function formatFixed(value: number): string {
 }
 
 export function WorkspaceSceneOutliner() {
-  // Scene state
-  const sceneId = useSceneStore((state) => state.sceneId)
-  const sceneRevision = useSceneStore((state) => state.sceneRevision)
-  const sceneSequence = useSceneStore((state) => state.sceneSequence)
-  const scenePlacements = useSceneStore((state) => state.scenePlacements)
-  const selectedPlacementId = useSceneStore((state) => state.selectedPlacementId)
-  const monitoringCameras = useSceneStore((state) => state.monitoringCameras)
-  const cameraDetectionOverlays = useSceneStore((state) => state.cameraDetectionOverlays)
-
-  // Viewport state
-  const selectedMonitoringCameraId = useViewportStore((state) => state.selectedMonitoringCameraId)
-
-  // UI state
-  const sceneEventLog = useUiStore((state) => state.sceneEventLog)
+  // Compose focused hooks
+  const sceneData = useOutlinerSceneData()
+  const filtering = useOutlinerFiltering({
+    sceneEventLog: sceneData.sceneEventLog,
+    scenePlacements: sceneData.scenePlacements,
+    monitoringCameras: sceneData.monitoringCameras,
+    cameraDetectionOverlays: sceneData.cameraDetectionOverlays,
+  })
+  const selection = useOutlinerSelection({
+    scenePlacements: sceneData.scenePlacements,
+    selectedPlacementId: sceneData.selectedPlacementId,
+  })
 
   const dispatchFromOutliner = createAppCommandDispatcher('ui.workspace_outliner')
 
-  const [openSections, setOpenSections] = useState<Record<OutlinerSectionKey, boolean>>({
-    cameras: true,
-    detections: false,
-    experts: true,
-    placements: true,
-  })
-  const [filterQuery, setFilterQuery] = useState('')
-  const normalizedQuery = filterQuery.trim().toLowerCase()
-
-  const sourceHeat = useMemo(() => {
-    const recent = sceneEventLog.slice(Math.max(0, sceneEventLog.length - 220))
-    return EXPERT_TAGS.map((tag) => ({
-      count: recent.filter((entry) => entry.source.includes(tag)).length,
-      id: tag,
-    }))
-  }, [sceneEventLog])
-
-  const detectionRows = useMemo<DetectionRow[]>(
-    () =>
-      cameraDetectionOverlays.flatMap((overlay) =>
-        overlay.boxes.map((box) => ({
-          cameraId: overlay.cameraId,
-          id: box.id,
-          trackLabel: box.trackId ?? box.label ?? box.id,
-        })),
-      ),
-    [cameraDetectionOverlays],
-  )
-
-  const filteredSourceHeat = useMemo(
-    () => sourceHeat.filter((entry) => matchesQuery([entry.id], normalizedQuery)),
-    [normalizedQuery, sourceHeat],
-  )
-
-  const filteredPlacements = useMemo(
-    () =>
-      scenePlacements.filter((placement) =>
-        matchesQuery([placement.assetId, placement.id, placement.objectId, placement.trackId], normalizedQuery),
-      ),
-    [normalizedQuery, scenePlacements],
-  )
-
-  const filteredCameras = useMemo(
-    () =>
-      monitoringCameras.filter((camera) => matchesQuery([camera.label, camera.id], normalizedQuery)),
-    [monitoringCameras, normalizedQuery],
-  )
-
-  const filteredDetections = useMemo(
-    () =>
-      detectionRows.filter((detection) => matchesQuery([detection.trackLabel, detection.id, detection.cameraId], normalizedQuery)),
-    [detectionRows, normalizedQuery],
-  )
-
-  const detectionsByCamera = useMemo(() => {
-    const groups = new Map<string, DetectionRow[]>()
-    for (const detection of filteredDetections) {
-      const existing = groups.get(detection.cameraId)
-      if (existing) {
-        existing.push(detection)
-        continue
-      }
-      groups.set(detection.cameraId, [detection])
-    }
-    return Array.from(groups.entries()).sort((left, right) => left[0].localeCompare(right[0]))
-  }, [filteredDetections])
-
-  const activeExperts = sourceHeat.filter((entry) => entry.count > 0).length
-  const selectedPlacementView = useMemo(
-    () => selectSelectedPlacementView(scenePlacements, selectedPlacementId),
-    [scenePlacements, selectedPlacementId],
-  )
-  const selectedPlacement = selectedPlacementView.placement
-  const selectedPlacementAsset = selectedPlacementView.asset
+  const activeExperts = filtering.sourceHeat.filter((entry) => entry.count > 0).length
 
   return (
     <section className="workspace-outliner">
       <header className="workspace-outliner-head">
         <span>Scene Outliner</span>
-        <span>{sceneId}</span>
+        <span>{sceneData.sceneId}</span>
       </header>
       <div className="workspace-outliner-toolbar">
         <input
-          value={filterQuery}
-          onChange={(event) => setFilterQuery(event.currentTarget.value)}
+          value={filtering.filterQuery}
+          onChange={(event) => filtering.setFilterQuery(event.currentTarget.value)}
           placeholder="Filter entities, cameras, detections..."
         />
         <span>
-          rev:{sceneRevision ?? '-'} seq:{sceneSequence ?? '-'}
+          rev:{sceneData.sceneRevision ?? '-'} seq:{sceneData.sceneSequence ?? '-'}
         </span>
       </div>
       <div className="workspace-outliner-body">
         <div className="workspace-tree-root">
-          <span className="workspace-tree-root-name">{sceneId}</span>
-          <span className="workspace-tree-root-meta">entities:{scenePlacements.length}</span>
+          <span className="workspace-tree-root-name">{sceneData.sceneId}</span>
+          <span className="workspace-tree-root-meta">entities:{sceneData.scenePlacements.length}</span>
         </div>
 
         {OUTLINER_SECTIONS.map((section) => {
           const Icon = section.icon
-          const isOpen = openSections[section.key]
+          const isOpen = filtering.openSections[section.key]
           const count =
             section.key === 'experts'
-              ? sectionCountLabel(sourceHeat.length, filteredSourceHeat.length, normalizedQuery)
+              ? sectionCountLabel(filtering.sourceHeat.length, filtering.filteredSourceHeat.length, filtering.normalizedQuery)
               : section.key === 'placements'
-                ? sectionCountLabel(scenePlacements.length, filteredPlacements.length, normalizedQuery)
+                ? sectionCountLabel(sceneData.scenePlacements.length, filtering.filteredPlacements.length, filtering.normalizedQuery)
                 : section.key === 'cameras'
-                  ? sectionCountLabel(monitoringCameras.length, filteredCameras.length, normalizedQuery)
-                  : sectionCountLabel(detectionRows.length, filteredDetections.length, normalizedQuery)
+                  ? sectionCountLabel(sceneData.monitoringCameras.length, filtering.filteredCameras.length, filtering.normalizedQuery)
+                  : sectionCountLabel(filtering.detectionRows.length, filtering.filteredDetections.length, filtering.normalizedQuery)
           return (
             <div key={section.key} className="workspace-tree-section">
               <button
                 type="button"
                 className={`workspace-tree-toggle ${isOpen ? 'open' : 'closed'}`}
-                onClick={() => setOpenSections((state) => ({ ...state, [section.key]: !state[section.key] }))}
+                onClick={() => filtering.setOpenSections((state) => ({ ...state, [section.key]: !state[section.key] }))}
               >
                 <span className="workspace-tree-toggle-main">
                   {isOpen ? (
@@ -206,8 +129,8 @@ export function WorkspaceSceneOutliner() {
               {isOpen ? (
                 <div className="workspace-tree-items">
                   {section.key === 'experts' ? (
-                    filteredSourceHeat.length > 0 ? (
-                      filteredSourceHeat.map((entry) => (
+                    filtering.filteredSourceHeat.length > 0 ? (
+                      filtering.filteredSourceHeat.map((entry) => (
                         <div key={entry.id} className="workspace-tree-item">
                           <span className="workspace-tree-item-main">
                             <span className={`workspace-tree-dot ${entry.count > 0 ? 'active' : 'idle'}`} />
@@ -224,12 +147,12 @@ export function WorkspaceSceneOutliner() {
                   ) : null}
 
                   {section.key === 'placements' ? (
-                    filteredPlacements.length > 0 ? (
-                      filteredPlacements.map((placement) => (
+                    filtering.filteredPlacements.length > 0 ? (
+                      filtering.filteredPlacements.map((placement) => (
                         <button
                           key={placement.id}
                           type="button"
-                          className={`workspace-tree-item selectable ${placement.id === selectedPlacementId ? 'selected' : ''}`}
+                          className={`workspace-tree-item selectable ${placement.id === sceneData.selectedPlacementId ? 'selected' : ''}`}
                           onClick={() =>
                             dispatchFromOutliner({
                               kind: 'set_selected_placement',
@@ -238,7 +161,7 @@ export function WorkspaceSceneOutliner() {
                           }
                         >
                           <span className="workspace-tree-item-main">
-                            <span className={`workspace-tree-dot ${placement.id === selectedPlacementId ? 'selected' : 'entity'}`} />
+                            <span className={`workspace-tree-dot ${placement.id === sceneData.selectedPlacementId ? 'selected' : 'entity'}`} />
                             <span>{placement.assetId}</span>
                           </span>
                           <span className="workspace-tree-item-meta">{placement.id}</span>
@@ -250,12 +173,12 @@ export function WorkspaceSceneOutliner() {
                   ) : null}
 
                   {section.key === 'cameras' ? (
-                    filteredCameras.length > 0 ? (
-                      filteredCameras.map((camera) => (
+                    filtering.filteredCameras.length > 0 ? (
+                      filtering.filteredCameras.map((camera) => (
                         <button
                           key={camera.id}
                           type="button"
-                          className={`workspace-tree-item selectable ${camera.id === selectedMonitoringCameraId ? 'selected' : ''}`}
+                          className={`workspace-tree-item selectable ${camera.id === sceneData.selectedMonitoringCameraId ? 'selected' : ''}`}
                           onClick={() =>
                             dispatchFromOutliner({
                               kind: 'set_selected_monitoring_camera',
@@ -264,7 +187,7 @@ export function WorkspaceSceneOutliner() {
                           }
                         >
                           <span className="workspace-tree-item-main">
-                            <span className={`workspace-tree-dot ${camera.id === selectedMonitoringCameraId ? 'selected' : 'camera'}`} />
+                            <span className={`workspace-tree-dot ${camera.id === sceneData.selectedMonitoringCameraId ? 'selected' : 'camera'}`} />
                             <span>{camera.label ?? camera.id}</span>
                           </span>
                           <span className="workspace-tree-item-meta">{camera.id}</span>
@@ -276,8 +199,8 @@ export function WorkspaceSceneOutliner() {
                   ) : null}
 
                   {section.key === 'detections' ? (
-                    detectionsByCamera.length > 0 ? (
-                      detectionsByCamera.map(([cameraId, detections]) => (
+                    filtering.detectionsByCamera.length > 0 ? (
+                      filtering.detectionsByCamera.map(([cameraId, detections]) => (
                         <div key={cameraId} className="workspace-tree-group">
                           <div className="workspace-tree-group-head">
                             <span>{cameraId}</span>
@@ -306,13 +229,13 @@ export function WorkspaceSceneOutliner() {
           )
         })}
 
-        {selectedPlacement ? (
+        {selection.selectedPlacement ? (
           <div className="workspace-outliner-inspector">
             <div className="workspace-inspector-head">
-              <span className="workspace-inspector-title">{selectedPlacement.id}</span>
+              <span className="workspace-inspector-title">{selection.selectedPlacement.id}</span>
               <span className="workspace-inspector-subtitle">
-                {selectedPlacement.assetId}
-                {selectedPlacement.objectId ? ` | ${selectedPlacement.objectId}` : ''}
+                {selection.selectedPlacement.assetId}
+                {selection.selectedPlacement.objectId ? ` | ${selection.selectedPlacement.objectId}` : ''}
               </span>
             </div>
             <div className="workspace-inspector-body">
@@ -321,15 +244,15 @@ export function WorkspaceSceneOutliner() {
                 <div className="workspace-inspector-axis-grid">
                   <span className="workspace-inspector-axis-value">
                     <span className="axis axis-x">x</span>
-                    <span>{formatFixed(selectedPlacement.planPositionM[0])}</span>
+                    <span>{formatFixed(selection.selectedPlacement.planPositionM[0])}</span>
                   </span>
                   <span className="workspace-inspector-axis-value">
                     <span className="axis axis-y">y</span>
-                    <span>{formatFixed(selectedPlacement.elevationM ?? 0)}</span>
+                    <span>{formatFixed(selection.selectedPlacement.elevationM ?? 0)}</span>
                   </span>
                   <span className="workspace-inspector-axis-value">
                     <span className="axis axis-z">z</span>
-                    <span>{formatFixed(selectedPlacement.planPositionM[1])}</span>
+                    <span>{formatFixed(selection.selectedPlacement.planPositionM[1])}</span>
                   </span>
                 </div>
               </div>
@@ -342,7 +265,7 @@ export function WorkspaceSceneOutliner() {
                   </span>
                   <span className="workspace-inspector-axis-value">
                     <span className="axis axis-y">y</span>
-                    <span>{formatFixed(selectedPlacement.rotationDeg ?? 0)}</span>
+                    <span>{formatFixed(selection.selectedPlacement.rotationDeg ?? 0)}</span>
                   </span>
                   <span className="workspace-inspector-axis-value">
                     <span className="axis axis-z">z</span>
@@ -355,15 +278,15 @@ export function WorkspaceSceneOutliner() {
                 <div className="workspace-inspector-axis-grid">
                   <span className="workspace-inspector-axis-value">
                     <span className="axis axis-x">x</span>
-                    <span>{formatFixed(selectedPlacementView.size?.width ?? 1)}</span>
+                    <span>{formatFixed(selection.selectedPlacementSize?.width ?? 1)}</span>
                   </span>
                   <span className="workspace-inspector-axis-value">
                     <span className="axis axis-y">y</span>
-                    <span>{formatFixed(selectedPlacementView.size?.height ?? 1)}</span>
+                    <span>{formatFixed(selection.selectedPlacementSize?.height ?? 1)}</span>
                   </span>
                   <span className="workspace-inspector-axis-value">
                     <span className="axis axis-z">z</span>
-                    <span>{formatFixed(selectedPlacementView.size?.depth ?? 1)}</span>
+                    <span>{formatFixed(selection.selectedPlacementSize?.depth ?? 1)}</span>
                   </span>
                 </div>
               </div>
@@ -372,7 +295,7 @@ export function WorkspaceSceneOutliner() {
               {INSPECTOR_PALETTE.map((color) => (
                 <span
                   key={color}
-                  className={`workspace-inspector-color ${selectedPlacementAsset?.miniMapColor === color ? 'active' : ''}`}
+                  className={`workspace-inspector-color ${selection.selectedPlacementAsset?.miniMapColor === color ? 'active' : ''}`}
                   style={{ backgroundColor: color }}
                   title={color}
                 />
